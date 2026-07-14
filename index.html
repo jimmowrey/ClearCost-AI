@@ -1,0 +1,393 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#0f2747" />
+  <title>ClearCost AI</title>
+  <link rel="manifest" href="manifest.webmanifest" />
+  <style>
+    :root{
+      --navy:#0f2747;
+      --blue:#245b8f;
+      --light:#f4f7fb;
+      --green:#2f7d58;
+      --text:#1f2937;
+      --muted:#667085;
+      --border:#d9e1ea;
+      --white:#ffffff;
+    }
+    *{box-sizing:border-box}
+    button,.option{touch-action:manipulation;-webkit-tap-highlight-color:transparent}
+    body{
+      margin:0;
+      font-family:Inter,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+      background:var(--light);
+      color:var(--text);
+    }
+    .app{
+      max-width:520px;
+      min-height:100vh;
+      margin:0 auto;
+      background:var(--white);
+      box-shadow:0 0 28px rgba(15,39,71,.10);
+    }
+    header{
+      position:sticky;
+      top:0;
+      z-index:10;
+      background:var(--navy);
+      color:white;
+      padding:18px 18px 14px;
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+    }
+    header h1{font-size:20px;margin:0}
+    header button{
+      background:transparent;border:0;color:white;font-size:22px;cursor:pointer;
+    }
+    main{padding:20px 18px 110px}
+    .screen{display:none}
+    .screen.active{display:block}
+    h2{font-size:27px;line-height:1.15;margin:8px 0 10px}
+    h3{font-size:18px;margin:22px 0 10px}
+    p{line-height:1.5}
+    .sub{color:var(--muted);margin-top:0}
+    .card{
+      border:1px solid var(--border);
+      border-radius:16px;
+      padding:16px;
+      margin:14px 0;
+      background:white;
+      box-shadow:0 4px 12px rgba(15,39,71,.05);
+    }
+    .metric{
+      padding:18px;
+      border-radius:16px;
+      background:var(--light);
+      margin:12px 0;
+    }
+    .metric label{display:block;color:var(--muted);font-size:14px}
+    .metric strong{display:block;font-size:28px;margin-top:4px;color:var(--navy)}
+    .btn{
+      width:100%;
+      border:0;
+      border-radius:14px;
+      padding:15px 16px;
+      margin:8px 0;
+      font-size:17px;
+      font-weight:700;
+      cursor:pointer;
+    }
+    .primary{background:var(--navy);color:white}
+    .secondary{background:white;color:var(--navy);border:1px solid var(--navy)}
+    .success{background:var(--green);color:white}
+    .ghost{background:var(--light);color:var(--navy)}
+    .option{
+      display:flex;
+      gap:12px;
+      align-items:flex-start;
+      border:1px solid var(--border);
+      border-radius:14px;
+      padding:14px;
+      margin:10px 0;
+      cursor:pointer;
+    }
+    .option.selected{
+      border:2px solid var(--green);
+      background:#f1f8f4;
+    }
+    .option input{margin-top:4px}
+    .option strong{display:block}
+    .option small{display:block;color:var(--muted);margin-top:4px}
+    .recommend{
+      border-left:6px solid var(--green);
+      background:#f1f8f4;
+    }
+    .pill{
+      display:inline-block;
+      background:#e9f5ee;
+      color:var(--green);
+      padding:5px 9px;
+      border-radius:999px;
+      font-size:12px;
+      font-weight:700;
+    }
+    .progress{
+      height:10px;background:#e9eef5;border-radius:999px;overflow:hidden;margin:18px 0;
+    }
+    .progress > div{
+      width:0;height:100%;background:var(--green);transition:width .4s;
+    }
+    .checklist div{padding:8px 0;color:var(--muted)}
+    .checklist .done{color:var(--green)}
+    .review-box{
+      border:1px solid var(--border);
+      border-radius:14px;
+      padding:14px;
+      margin:12px 0;
+      display:flex;
+      justify-content:space-between;
+      gap:12px;
+    }
+    .review-box span:first-child{color:var(--muted)}
+    .review-box strong{text-align:right}
+    .toolbar{
+      position:fixed;
+      left:50%;
+      bottom:0;
+      transform:translateX(-50%);
+      width:min(520px,100%);
+      background:white;
+      border-top:1px solid var(--border);
+      padding:10px 12px calc(10px + env(safe-area-inset-bottom));
+      display:flex;
+      gap:8px;
+      z-index:20;
+    }
+    .toolbar button{
+      flex:1;border:0;border-radius:12px;padding:12px 8px;font-weight:700;
+      background:var(--light);color:var(--navy);cursor:pointer;
+    }
+    .toolbar button.active{background:var(--navy);color:white}
+    .small{font-size:13px;color:var(--muted)}
+    input[type="number"]{
+      width:100%;padding:13px;border:1px solid var(--border);border-radius:12px;font-size:17px;
+    }
+    .hidden{display:none!important}
+  </style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <h1>ClearCost AI</h1>
+    <button onclick="go('settings')" aria-label="Settings">⚙</button>
+  </header>
+
+  <main>
+    <section id="home" class="screen active">
+      <h2>Merchant analysis, ready in minutes.</h2>
+      <p class="sub">Scan statements, review the recommendation, choose the program, and generate a merchant-ready report.</p>
+      <button class="btn primary" onclick="go('scan')">📷 New Analysis</button>
+      <button class="btn secondary" onclick="go('previous')">📂 Previous Analyses</button>
+      <div class="card">
+        <span class="pill">Reference Merchant</span>
+        <h3 style="margin-top:10px">Phooj Ywg Lee's Market</h3>
+        <p class="small">June 1–30, 2026 • Bank of America Merchant Services</p>
+        <button class="btn ghost" onclick="go('summary')">Open Analysis</button>
+      </div>
+    </section>
+
+    <section id="scan" class="screen">
+      <h2>New Analysis</h2>
+      <p class="sub">Add one or more statement files.</p>
+      <div class="card">
+        <button class="btn primary" onclick="fakeScan()">📷 Scan Statement</button>
+        <button class="btn secondary" onclick="fakeScan()">📄 Import PDF</button>
+      </div>
+      <div id="scanStatus" class="card hidden">
+        <strong>4 pages added</strong>
+        <p class="small">Page order and readability check ready.</p>
+        <button class="btn success" onclick="analyze()">Analyze Statements</button>
+      </div>
+    </section>
+
+    <section id="analyzing" class="screen">
+      <h2>Here's what I'm checking.</h2>
+      <div class="progress"><div id="bar"></div></div>
+      <div class="checklist" id="checks">
+        <div>Reading statement pages…</div>
+        <div>Identifying merchant and processor…</div>
+        <div>Checking totals and fees…</div>
+        <div>Modeling three solutions…</div>
+        <div>Preparing recommendation…</div>
+      </div>
+    </section>
+
+    <section id="summary" class="screen">
+      <h2>Phooj Ywg Lee's Market</h2>
+      <p class="sub">Analysis period: June 1–30, 2026</p>
+      <div class="metric"><label>Monthly Card Sales</label><strong>$88,903.96</strong></div>
+      <div class="metric"><label>Monthly Processing Expense</label><strong>$1,678.49</strong></div>
+      <div class="metric"><label>Card Transactions</label><strong>3,106</strong></div>
+
+      <div class="card recommend">
+        <span class="pill">AI Recommendation</span>
+        <h3>3% Credit Card Surcharge</h3>
+        <p class="small">Best fit based on the statement data and the merchant's stated interest in surcharge.</p>
+        <button class="btn ghost" onclick="toggleWhy()">Show Me Why</button>
+        <div id="why" class="hidden small">
+          Debit and EBT continue to process normally, while eligible credit card transactions can offset a significant portion of processing expense.
+        </div>
+      </div>
+      <button class="btn primary" onclick="go('decision')">Choose Program</button>
+    </section>
+
+    <section id="decision" class="screen">
+      <h2>Select the program</h2>
+      <p class="sub">The AI recommends. You make the final decision.</p>
+      <label class="option selected" data-value="surcharge">
+        <input type="radio" name="program" value="surcharge" checked />
+        <span><strong>3% Credit Card Surcharge</strong><small>AI recommendation</small></span>
+      </label>
+      <label class="option" data-value="traditional">
+        <input type="radio" name="program" value="traditional" />
+        <span><strong>Traditional Processing</strong><small>Interchange Plus pricing</small></span>
+      </label>
+      <label class="option" data-value="cash">
+        <input type="radio" name="program" value="cash" />
+        <span><strong>Cash Discount</strong><small>Cash customers receive a discount</small></span>
+      </label>
+      <button class="btn primary" onclick="go('pricing')">Continue</button>
+    </section>
+
+    <section id="pricing" class="screen">
+      <h2>Pricing objective</h2>
+      <p class="sub">Choose the outcome. Detailed pricing stays in the agent view.</p>
+      <label class="option"><input type="radio" name="strategy" value="win"><span><strong>Win the Account</strong><small>More aggressive merchant savings</small></span></label>
+      <label class="option selected"><input type="radio" name="strategy" value="balanced" checked><span><strong>Balanced</strong><small>Share value between merchant savings and monthly residual</small></span></label>
+      <label class="option"><input type="radio" name="strategy" value="profit"><span><strong>Maximize Profit</strong><small>Stay competitive while preserving more margin</small></span></label>
+      <label class="option"><input type="radio" name="strategy" value="custom"><span><strong>Custom</strong><small>Enter your own pricing</small></span></label>
+
+      <div id="customFields" class="card hidden">
+        <label class="small">Percentage markup</label>
+        <input type="number" step="0.01" value="0.50">
+        <label class="small">Per-item fee</label>
+        <input type="number" step="0.01" value="0.10">
+      </div>
+      <button class="btn primary" onclick="go('approve')">Review & Approve</button>
+    </section>
+
+    <section id="approve" class="screen">
+      <h2>Review & Approve</h2>
+      <div class="review-box"><span>Merchant</span><strong>Phooj Ywg Lee's Market</strong></div>
+      <div class="review-box"><span>AI Recommendation</span><strong>3% Credit Card Surcharge</strong></div>
+      <div class="review-box"><span>Your Selection</span><strong id="selectedProgram">3% Credit Card Surcharge</strong></div>
+      <div class="review-box"><span>Pricing Objective</span><strong id="selectedStrategy">Balanced</strong></div>
+      <div class="review-box"><span>Projected Monthly Savings</span><strong>TBD</strong></div>
+      <div class="review-box"><span>Your Monthly Residual</span><strong>TBD</strong></div>
+      <button class="btn success" onclick="go('generate')">Generate Merchant Review</button>
+      <button class="btn secondary" onclick="go('decision')">Change Selection</button>
+    </section>
+
+    <section id="generate" class="screen">
+      <h2>Ready to Present</h2>
+      <p class="sub">The final report will reflect your selected program.</p>
+      <div class="card">
+        <h3>Merchant Processing Review</h3>
+        <p class="small">Prepared exclusively for Phooj Ywg Lee's Market</p>
+        <button class="btn primary" onclick="alert('Prototype: PDF generation connects here.')">📄 View Review</button>
+        <button class="btn secondary" onclick="alert('Prototype: email sharing connects here.')">✉ Email</button>
+        <button class="btn secondary" onclick="window.print()">🖨 Print</button>
+      </div>
+      <button class="btn ghost" onclick="go('home')">Save & Return Home</button>
+    </section>
+
+    <section id="previous" class="screen">
+      <h2>Previous Analyses</h2>
+      <div class="card">
+        <strong>Phooj Ywg Lee's Market</strong>
+        <p class="small">June 2026 • Surcharge selected</p>
+        <button class="btn ghost" onclick="go('summary')">Open</button>
+      </div>
+    </section>
+
+    <section id="settings" class="screen">
+      <h2>Settings</h2>
+      <div class="card">
+        <h3>Consultant Profile</h3>
+        <p>Jim Mowrey<br>530-720-6690<br>jimmowrey@comcast.net</p>
+      </div>
+      <div class="card">
+        <h3>Display Rules</h3>
+        <p class="small">Merchant report: no effective rate, no residual, no internal pricing.</p>
+      </div>
+      <button class="btn primary" onclick="go('home')">Done</button>
+    </section>
+  </main>
+
+  <nav class="toolbar">
+    <button id="navHome" class="active" onclick="go('home')">Home</button>
+    <button onclick="go('scan')">New</button>
+    <button onclick="go('previous')">Saved</button>
+  </nav>
+</div>
+
+<script>
+  const labels = {
+    surcharge: "3% Credit Card Surcharge",
+    traditional: "Traditional Processing",
+    cash: "Cash Discount"
+  };
+  const strategyLabels = {
+    win:"Win the Account",
+    balanced:"Balanced",
+    profit:"Maximize Profit",
+    custom:"Custom"
+  };
+
+  function go(id){
+    document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
+    document.getElementById(id).classList.add('active');
+    window.scrollTo({top:0,behavior:'smooth'});
+    document.getElementById('navHome').classList.toggle('active',id==='home');
+    if(id==='approve'){
+      const program=document.querySelector('input[name="program"]:checked')?.value || 'surcharge';
+      const strategy=document.querySelector('input[name="strategy"]:checked')?.value || 'balanced';
+      document.getElementById('selectedProgram').textContent=labels[program];
+      document.getElementById('selectedStrategy').textContent=strategyLabels[strategy];
+    }
+  }
+
+  function fakeScan(){
+    document.getElementById('scanStatus').classList.remove('hidden');
+  }
+
+  function analyze(){
+    go('analyzing');
+    const bar=document.getElementById('bar');
+    const items=[...document.querySelectorAll('#checks div')];
+    let i=0;
+    const timer=setInterval(()=>{
+      if(i<items.length){
+        items[i].classList.add('done');
+        items[i].textContent='✓ '+items[i].textContent.replace('✓ ','');
+        i++;
+        bar.style.width=(i/items.length*100)+'%';
+      } else {
+        clearInterval(timer);
+        setTimeout(()=>go('summary'),500);
+      }
+    },450);
+  }
+
+  function toggleWhy(){
+    document.getElementById('why').classList.toggle('hidden');
+  }
+
+  document.addEventListener('change',e=>{
+    if(e.target.name==='program'){
+      document.querySelectorAll('#decision .option').forEach(x=>x.classList.remove('selected'));
+      e.target.closest('.option').classList.add('selected');
+    }
+    if(e.target.name==='strategy'){
+      document.querySelectorAll('#pricing .option').forEach(x=>x.classList.remove('selected'));
+      e.target.closest('.option').classList.add('selected');
+      document.getElementById('customFields').classList.toggle('hidden',e.target.value!=='custom');
+    }
+  });
+
+  if (location.protocol === 'file:') {
+    document.addEventListener('DOMContentLoaded', () => {
+      const notice = document.createElement('div');
+      notice.style.cssText = 'position:fixed;left:10px;right:10px;top:100px;z-index:9999;background:#fff4d6;border:1px solid #e6b84c;border-radius:12px;padding:12px;font:600 14px system-ui;color:#5b4300;box-shadow:0 6px 18px rgba(0,0,0,.15)';
+      notice.innerHTML = 'This prototype is opened as a local file. For reliable phone navigation, publish it to Cloudflare Pages, GitHub Pages, or another web host.';
+      document.body.appendChild(notice);
+      setTimeout(() => notice.remove(), 9000);
+    });
+  }
+
+</script>
+</body>
+</html>
