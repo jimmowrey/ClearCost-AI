@@ -1,0 +1,42 @@
+{
+  "provider": "verified_fixture",
+  "document_confidence": 1.0,
+  "pages": [
+    {
+      "page_number": 1,
+      "confidence": 1.0,
+      "source": "verified_manual_transcription",
+      "full_text": "BANK OF AMERICA MERCHANT SERVICES\nMerchant Name: Phooj Ywg Lee's Market\nStatement Period: June 1, 2026 - June 30, 2026\nCard Volume: $88,903.96\nFees Charged: $1,853.42\nNet Funding: $87,050.54"
+    },
+    {
+      "page_number": 2,
+      "confidence": 1.0,
+      "source": "verified_manual_transcription",
+      "full_text": "CARD TYPE SUMMARY\nDebit (PIN & Signature): $50,385.77\nMastercard: $7,147.55\nVisa: $14,142.56\nDiscover: $1,141.98\nAmerican Express: $1,253.15\nEBT: $14,832.95\nTotal Transactions: 3,106"
+    },
+    {
+      "page_number": 3,
+      "confidence": 1.0,
+      "source": "verified_manual_transcription",
+      "full_text": "SUPPORTING FINANCIAL DETAIL\nInterchange and qualification information."
+    },
+    {
+      "page_number": 4,
+      "confidence": 1.0,
+      "source": "verified_manual_transcription",
+      "full_text": "SERVICE CHARGES\nPCI Compliance Fee $9.95\nMC Monthly Location Fee $1.25\nDebit Transaction Fee $145.30\nNetwork Authorization Fee $31.06"
+    },
+    {
+      "page_number": 5,
+      "confidence": 1.0,
+      "source": "verified_manual_transcription",
+      "full_text": "FINANCIAL SUMMARY\nPending Financial Charges $96.34\nGrand Total Fees: $1,678.49"
+    },
+    {
+      "page_number": 6,
+      "confidence": 1.0,
+      "source": "verified_user_confirmation",
+      "full_text": "INFORMATIONAL / DISCLOSURE ONLY\nThis page contains no financial data requiring evaluation."
+    }
+  ]
+}

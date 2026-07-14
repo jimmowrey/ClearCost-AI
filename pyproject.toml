@@ -1,0 +1,12 @@
+[project]
+name = "clearcost-ai"
+version = "1.0.0"
+description = "ClearCost AI integrated production repository"
+requires-python = ">=3.11"
+dependencies = [
+  "PyMuPDF>=1.24,<2",
+  "Pillow>=10,<12"
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

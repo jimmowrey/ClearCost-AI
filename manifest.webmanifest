@@ -1,9 +1,0 @@
-{
-  "name": "ClearCost AI",
-  "short_name": "ClearCost AI",
-  "start_url": "./index.html",
-  "display": "standalone",
-  "background_color": "#f4f7fb",
-  "theme_color": "#0f2747",
-  "icons": []
-}

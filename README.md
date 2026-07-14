@@ -1,12 +1,7 @@
-# ClearCost AI v1.2
+# ClearCost AI
 
-Adds:
-- Customer surcharge percentage
-- Linked, adjustable merchant credit-card percentage
-- Cash-discount percentage
-- Adjustable transaction fee
-- Traditional percentage markup
-- Monthly account fee
-- Profit Protection placeholder
+This is the first integrated production-intent repository. Previous isolated milestone
+packages have been consolidated into one codebase.
 
-The savings and residual fields remain calculation-pending until verified processor buy costs and program costs are loaded. This prevents unsupported numbers from being presented to a merchant.
+No merchant-facing release should be generated from this repository until all Version 1.0
+release gates are satisfied.
