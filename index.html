@@ -12,7 +12,7 @@
 <header class="topbar"><div><div class="eyebrow">ClearCost AI</div><h1 id="screenTitle">Home</h1></div><button class="icon-button" type="button" data-screen="settings" aria-label="Open settings">⚙</button></header>
 <main>
 <section id="home" class="screen active">
-<div class="hero"><span class="version">ClearCost AI v1.0 Development · Build 3</span><h2>Merchant statement analysis from your phone.</h2><p>Import one or more statements, verify the files, and prepare them for processing.</p></div>
+<div class="hero"><span class="version">ClearCost AI v1.0 Development · Build 4.1</span><h2>Merchant statement analysis from your phone.</h2><p>Import one or more statements, verify the files, and prepare them for processing.</p></div>
 <button class="primary action-card" type="button" data-screen="new-analysis"><span class="action-icon">＋</span><span><strong>New Analysis</strong><small>Import merchant statement PDFs</small></span></button>
 <button class="secondary action-card" type="button" data-screen="history"><span class="action-icon">▣</span><span><strong>History</strong><small>Open saved analyses</small></span></button>
 <button class="secondary action-card" type="button" data-screen="settings"><span class="action-icon">⚙</span><span><strong>Settings</strong><small>Consultant and application preferences</small></span></button>
@@ -27,11 +27,21 @@
 <button id="continueButton" class="primary full-width" type="button" disabled>Validate Statements</button>
 </section>
 <section id="validation" class="screen">
-<div class="section-intro"><h2>Statement Validation</h2><p>Build 3 verifies document integrity before fee extraction begins.</p></div>
+<div class="section-intro"><h2>Statement Validation</h2><p>Build 3 verifies document integrity. Build 4.1 maps statement sections and extracts identity metadata.</p></div>
 <div id="validationFiles" class="statement-queue"></div>
 <div class="status-panel"><div class="status-row"><span>Files loaded</span><strong id="validationLoaded">0</strong></div><div class="status-row"><span>Page count</span><strong id="pageCountStatus">Waiting</strong></div><div class="status-row"><span>Text layers</span><strong id="textLayerStatus">Waiting</strong></div><div class="status-row"><span>OCR required</span><strong id="ocrRequiredStatus">Waiting</strong></div><div class="status-row"><span>Statement period</span><strong id="periodStatus">Waiting</strong></div><div class="status-row"><span>Merchant / MID</span><strong id="merchantStatus">Waiting</strong></div><div class="status-row"><span>Missing pages</span><strong id="missingStatus">Waiting</strong></div><div class="status-row"><span>Duplicate pages</span><strong id="duplicateStatus">Waiting</strong></div><div class="status-row"><span>Rotated pages</span><strong id="rotationStatus">Waiting</strong></div><div class="status-row"><span>Readability</span><strong id="readabilityStatus">Waiting</strong></div><div class="status-row"><span>Page order</span><strong id="orderStatus">Waiting</strong></div></div>
 <div id="validationNotice" class="notice"><strong>Validation not started</strong><p>Select statements and run validation.</p></div>
-<button class="secondary full-width" type="button" data-screen="new-analysis">Back to Statement Queue</button>
+<button id="extractButton" class="primary full-width" type="button" disabled>Extract Statement Structure</button><button class="secondary full-width" type="button" data-screen="new-analysis">Back to Statement Queue</button>
+</section>
+
+<section id="extraction" class="screen">
+<div class="section-intro"><h2>Statement Extraction</h2><p>Build 4.1 creates a traceable document map before financial calculations begin.</p></div>
+<div id="extractionSummary" class="status-panel"></div>
+<div class="queue-header"><h3>Merchant & Statement Identity</h3></div><div id="metadataResults" class="result-list"></div>
+<div class="queue-header"><h3>Detected Sections</h3></div><div id="sectionResults" class="result-list"></div>
+<div class="queue-header"><h3>Fee Candidates</h3></div><div id="feeCandidateResults" class="result-list"></div>
+<div id="extractionNotice" class="notice"><strong>Extraction not started</strong><p>Run statement validation first.</p></div>
+<button class="secondary full-width" type="button" data-screen="validation">Back to Validation</button>
 </section>
 <section id="history" class="screen"><div class="section-intro"><h2>History</h2><p>Saved analyses will appear here after statement storage is connected.</p></div><div class="empty-state">No saved analyses yet.</div></section>
 <section id="settings" class="screen"><div class="section-intro"><h2>Settings</h2><p>Consultant details and profitability settings will be stored here.</p></div><div class="settings-card"><label>Consultant name<input type="text" value="Jim Mowrey"></label><label>Phone<input type="tel" value="530-720-6690"></label><label>Email<input type="email" value="jimmowrey@comcast.net"></label><label>Minimum monthly residual<input type="number" value="500" min="0" step="25"></label></div><div class="notice"><strong>Merchant data separation</strong><p>Consultant settings remain separate from merchant-facing reports.</p></div></section>
