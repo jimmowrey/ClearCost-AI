@@ -152,6 +152,7 @@
     }
     .toolbar button.active{background:var(--navy);color:white}
     .small{font-size:13px;color:var(--muted)}
+    .field{margin:14px 0}.field label{display:block;font-weight:700;margin-bottom:6px}
     input[type="number"]{
       width:100%;padding:13px;border:1px solid var(--border);border-radius:12px;font-size:17px;
     }
@@ -239,23 +240,57 @@
         <input type="radio" name="program" value="cash" />
         <span><strong>Cash Discount</strong><small>Cash customers receive a discount</small></span>
       </label>
-      <button class="btn primary" onclick="go('pricing')">Continue</button>
+      <button class="btn primary" onclick="openProgramConfiguration()">Continue</button>
     </section>
 
     <section id="pricing" class="screen">
-      <h2>Pricing objective</h2>
-      <p class="sub">Choose the outcome. Detailed pricing stays in the agent view.</p>
-      <label class="option"><input type="radio" name="strategy" value="win"><span><strong>Win the Account</strong><small>More aggressive merchant savings</small></span></label>
-      <label class="option selected"><input type="radio" name="strategy" value="balanced" checked><span><strong>Balanced</strong><small>Share value between merchant savings and monthly residual</small></span></label>
-      <label class="option"><input type="radio" name="strategy" value="profit"><span><strong>Maximize Profit</strong><small>Stay competitive while preserving more margin</small></span></label>
-      <label class="option"><input type="radio" name="strategy" value="custom"><span><strong>Custom</strong><small>Enter your own pricing</small></span></label>
+      <h2>Program Configuration</h2>
+      <p class="sub">Adjust the pricing levers. Results update immediately.</p>
 
-      <div id="customFields" class="card hidden">
-        <label class="small">Percentage markup</label>
-        <input type="number" step="0.01" value="0.50">
-        <label class="small">Per-item fee</label>
-        <input type="number" step="0.01" value="0.10">
+      <div id="surchargeFields">
+        <div class="field">
+          <label>Customer credit-card surcharge %</label>
+          <input id="customerSurcharge" type="number" min="0" max="3" step="0.25" value="3.00">
+        </div>
+        <div class="field">
+          <label>Merchant credit-card rate %</label>
+          <input id="merchantCreditRate" type="number" min="0" step="0.05" value="0.00">
+        </div>
+        <p class="small">3.00% customer defaults to 0.00% merchant. 2.00% customer defaults to 1.50% merchant. Merchant pricing remains adjustable.</p>
       </div>
+
+      <div id="cashFields" class="hidden">
+        <div class="field">
+          <label>Cash discount %</label>
+          <input id="cashDiscount" type="number" min="0" step="0.25" value="3.50">
+        </div>
+      </div>
+
+      <div id="traditionalFields" class="hidden">
+        <div class="field">
+          <label>Percentage markup %</label>
+          <input id="traditionalMarkup" type="number" min="0" step="0.05" value="0.50">
+        </div>
+      </div>
+
+      <div class="field">
+        <label>Transaction fee</label>
+        <input id="transactionFee" type="number" min="0" step="0.01" value="0.10">
+        <p class="small">This is especially important for high-volume, low-ticket merchants.</p>
+      </div>
+
+      <div class="field">
+        <label>Monthly account fee</label>
+        <input id="monthlyFee" type="number" min="0" step="1" value="25">
+      </div>
+
+      <div class="card">
+        <h3>Live Results</h3>
+        <div class="review-box"><span>Projected monthly savings</span><strong id="merchantSavings">Calculation pending</strong></div>
+        <div class="review-box"><span>Your monthly residual</span><strong id="monthlyResidual">Calculation pending</strong></div>
+        <div id="profitWarning" class="small">Profit Protection will block a proposal that falls below your configured minimum or produces a loss.</div>
+      </div>
+
       <button class="btn primary" onclick="go('approve')">Review & Approve</button>
     </section>
 
@@ -387,6 +422,24 @@
       setTimeout(() => notice.remove(), 9000);
     });
   }
+
+
+  function openProgramConfiguration(){
+    const program=document.querySelector('input[name="program"]:checked')?.value || 'surcharge';
+    document.getElementById('surchargeFields').classList.toggle('hidden',program!=='surcharge');
+    document.getElementById('cashFields').classList.toggle('hidden',program!=='cash');
+    document.getElementById('traditionalFields').classList.toggle('hidden',program!=='traditional');
+    go('pricing');
+  }
+
+  document.addEventListener('input', e => {
+    if(e.target.id==='customerSurcharge'){
+      const customer=parseFloat(e.target.value||0);
+      const merchant=document.getElementById('merchantCreditRate');
+      if(Math.abs(customer-3.00)<0.001) merchant.value='0.00';
+      if(Math.abs(customer-2.00)<0.001) merchant.value='1.50';
+    }
+  });
 
 </script>
 </body>
