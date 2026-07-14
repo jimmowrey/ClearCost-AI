@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#0f2747">
+  <title>ClearCost AI</title>
+  <link rel="stylesheet" href="css/app.css">
+</head>
+<body>
+  <div class="app-shell">
+    <header class="topbar">
+      <div>
+        <div class="eyebrow">ClearCost AI</div>
+        <h1 id="screenTitle">Home</h1>
+      </div>
+      <button class="icon-button" type="button" data-screen="settings" aria-label="Open settings">⚙</button>
+    </header>
+
+    <main>
+      <section id="home" class="screen active">
+        <div class="hero">
+          <span class="version">ClearCost AI v1.0 Development</span>
+          <h2>Merchant statement analysis from your phone.</h2>
+          <p>Import one or more statements, verify the files, and prepare them for processing.</p>
+        </div>
+
+        <button class="primary action-card" type="button" data-screen="new-analysis">
+          <span class="action-icon">＋</span>
+          <span><strong>New Analysis</strong><small>Import merchant statement PDFs</small></span>
+        </button>
+        <button class="secondary action-card" type="button" data-screen="history">
+          <span class="action-icon">▣</span>
+          <span><strong>History</strong><small>Open saved analyses</small></span>
+        </button>
+        <button class="secondary action-card" type="button" data-screen="settings">
+          <span class="action-icon">⚙</span>
+          <span><strong>Settings</strong><small>Consultant and application preferences</small></span>
+        </button>
+      </section>
+
+      <section id="new-analysis" class="screen">
+        <div class="section-intro">
+          <h2>New Analysis</h2>
+          <p>Select one or more PDF statements. No statement data is analyzed until processing is connected.</p>
+        </div>
+
+        <label class="drop-zone" id="dropZone">
+          <input id="pdfInput" type="file" accept="application/pdf,.pdf" multiple>
+          <span class="drop-icon">PDF</span>
+          <strong>Select PDF statement(s)</strong>
+          <small>or drag and drop files here</small>
+        </label>
+
+        <div class="summary-grid">
+          <div class="summary-card"><span>Statements selected</span><strong id="statementCount">0</strong></div>
+          <div class="summary-card"><span>Total file size</span><strong id="totalSize">0 KB</strong></div>
+        </div>
+
+        <div class="queue-header">
+          <h3>Statement Queue</h3>
+          <button id="clearQueue" class="text-button" type="button" disabled>Clear</button>
+        </div>
+
+        <div id="emptyQueue" class="empty-state">No statements selected.</div>
+        <div id="statementQueue" class="statement-queue" aria-live="polite"></div>
+
+        <div class="status-panel">
+          <h3>Processing Status</h3>
+          <div class="status-row"><span>PDF files</span><strong id="fileStatus">Waiting for statement selection</strong></div>
+          <div class="status-row"><span>Page validation</span><strong>Waiting for statement processing</strong></div>
+          <div class="status-row"><span>Processor detection</span><strong>Waiting for statement processing</strong></div>
+          <div class="status-row"><span>OCR</span><strong>Waiting for statement processing</strong></div>
+          <div class="status-row"><span>Financial analysis</span><strong>Waiting for statement processing</strong></div>
+        </div>
+
+        <button id="continueButton" class="primary full-width" type="button" disabled data-screen="validation">Continue to Validation</button>
+      </section>
+
+      <section id="validation" class="screen">
+        <div class="section-intro">
+          <h2>Statement Validation</h2>
+          <p>The selected files are loaded. Automated PDF reading and OCR are not connected yet.</p>
+        </div>
+        <div id="validationFiles" class="statement-queue"></div>
+        <div class="status-panel">
+          <div class="status-row"><span>Files loaded</span><strong id="validationLoaded">0</strong></div>
+          <div class="status-row"><span>Page count</span><strong>Waiting for statement processing</strong></div>
+          <div class="status-row"><span>Duplicate pages</span><strong>Waiting for statement processing</strong></div>
+          <div class="status-row"><span>Rotated pages</span><strong>Waiting for statement processing</strong></div>
+          <div class="status-row"><span>Readability</span><strong>Waiting for statement processing</strong></div>
+        </div>
+        <div class="notice">
+          <strong>Next engine connection</strong>
+          <p>The PDF import engine will read page counts, detect text layers, and determine whether OCR is required.</p>
+        </div>
+        <button class="secondary full-width" type="button" data-screen="new-analysis">Back to Statement Queue</button>
+      </section>
+
+      <section id="history" class="screen">
+        <div class="section-intro"><h2>History</h2><p>Saved analyses will appear here after statement storage is connected.</p></div>
+        <div class="empty-state">No saved analyses yet.</div>
+      </section>
+
+      <section id="settings" class="screen">
+        <div class="section-intro"><h2>Settings</h2><p>Consultant details and profitability settings will be stored here.</p></div>
+        <div class="settings-card">
+          <label>Consultant name<input type="text" value="Jim Mowrey"></label>
+          <label>Phone<input type="tel" value="530-720-6690"></label>
+          <label>Email<input type="email" value="jimmowrey@comcast.net"></label>
+          <label>Minimum monthly residual<input type="number" value="500" min="0" step="25"></label>
+        </div>
+        <div class="notice"><strong>Merchant data separation</strong><p>Consultant settings remain separate from merchant-facing reports.</p></div>
+      </section>
+    </main>
+
+    <nav class="bottom-nav" aria-label="Primary navigation">
+      <button type="button" data-screen="home" class="active">Home</button>
+      <button type="button" data-screen="new-analysis">New</button>
+      <button type="button" data-screen="history">History</button>
+      <button type="button" data-screen="settings">Settings</button>
+    </nav>
+  </div>
+  <script src="js/app.js" defer></script>
+</body>
+</html>
