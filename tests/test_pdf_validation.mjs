@@ -1,0 +1,11 @@
+import assert from 'node:assert/strict';
+import {extractPrintedPage,extractStatementPeriod,extractMid,detectMissingAndOrder,compareIdentity,stableHash} from '../js/pdf-validation.js';
+assert.deepEqual(extractPrintedPage('Page 2 of 6'),{current:2,total:6});
+assert.equal(extractMid('Merchant ID: 000000007439557'),'000000007439557');
+assert.ok(extractStatementPeriod('Statement Period: June 1, 2026 through June 30, 2026'));
+assert.deepEqual(detectMissingAndOrder([{current:1,total:4},{current:2,total:4},{current:4,total:4}]).missing,[3]);
+assert.deepEqual(detectMissingAndOrder([{current:1,total:3},{current:3,total:3},{current:2,total:3}]).outOfOrder,[2]);
+assert.equal(compareIdentity([{period:'a',mid:'1'},{period:'a',mid:'1'}]).periodMatch,true);
+assert.equal(compareIdentity([{period:'a'},{period:'b'}]).periodMatch,false);
+assert.equal(stableHash('same'),stableHash('same'));
+console.log('Build 3 PDF validation regression tests passed.');
