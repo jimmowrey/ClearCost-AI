@@ -62,7 +62,7 @@ const fallbackExtraction=await buildStatementExtraction({
   name:'low-confidence.pdf',
   pageCount:1,
   logoText:'UNKNOWN',
-  pages:[{index:1,text:'FIS Global and Signapay references only\nMerchant ID: 123456789012'}]
+  pages:[{index:1,text:'FIS Global and Signapay references only\nMerchant ID: ABC123'}]
 },{detector});
 assert.equal(fallbackExtraction.processor.name,'Generic Processor');
 assert.equal(fallbackExtraction.processor.detectedName,'Payroc');
