@@ -1,0 +1,11 @@
+{
+  "packs": [
+    "common",
+    "generic",
+    "payroc",
+    "worldpay",
+    "fiserv",
+    "tsys",
+    "square"
+  ]
+}

@@ -1,5 +1,10 @@
 import assert from 'node:assert/strict';
 import {SECTION_TYPES,classifySectionHeading,segmentPage,extractMetadataFromPages,detectProcessor,extractFeeCandidates,buildStatementExtraction} from '../js/statement-extraction.js';
+import {NodeProcessorRuleLoader} from '../js/processor-rule-loader-node.js';
+import {ProcessorDetector} from '../js/processor-detector.js';
+
+const detector=new ProcessorDetector(new NodeProcessorRuleLoader());
+
 assert.equal(classifySectionHeading('INTERCHANGE DETAIL'),SECTION_TYPES.INTERCHANGE);
 assert.equal(classifySectionHeading('Deposit Summary'),SECTION_TYPES.DEPOSITS);
 const sections=segmentPage('Merchant Information\nMerchant Name: Country Butcher\nMerchant ID: 123456789\nProcessing Summary\nGross Sales 10,000.00\nOther Fees\nMonthly Account Fee 25.00',1);
@@ -9,15 +14,19 @@ const metadata=extractMetadataFromPages([{index:1,text:'Merchant Name: Country B
 assert.equal(metadata.merchantName.value,'Country Butcher');
 assert.equal(metadata.merchantId.value,'123456789');
 assert.ok(metadata.statementPeriod.value.includes('June'));
-assert.equal(detectProcessor('PAYROC merchant statement').name,'Payroc');
-assert.equal(detectProcessor('unbranded statement').name,'Unknown processor');
+assert.equal((await detectProcessor('PAYROC merchant statement',{detector})).name,'Payroc');
+const unknownProcessor=await detectProcessor('unbranded statement',{detector});
+assert.equal(unknownProcessor.name,'Unknown processor');
+assert.equal(unknownProcessor.rulePackId,'generic');
 const feeSections=segmentPage('Other Fees\nMonthly Account Fee 25.00\nPCI Fee $9.95',2);
 const fees=extractFeeCandidates(feeSections);
 assert.equal(fees.length,2);
 assert.equal(fees[0].amount,25);
-const extraction=buildStatementExtraction({name:'sample.pdf',pageCount:1,pages:[{index:1,text:'Worldpay\nMerchant Name: Test Shop\nMerchant ID: 987654321\nOther Fees\nBatch Fee 12.50'}]});
+const extraction=await buildStatementExtraction({name:'sample.pdf',pageCount:1,pages:[{index:1,text:'Worldpay\nMerchant Name: Test Shop\nMerchant ID: 987654321\nOther Fees\nBatch Fee 12.50'}]},{detector});
 assert.equal(extraction.processor.name,'Worldpay');
+assert.equal(extraction.processor.rulePackId,'worldpay');
 assert.equal(extraction.metadata.merchantName.value,'Test Shop');
 assert.equal(extraction.feeCandidates.length,1);
 assert.equal(extraction.extractionLog[0].page,1);
+assert.ok(extraction.extractionLog.some(entry=>entry.field==='processor_detection'));
 console.log('Build 4.1 statement extraction regression tests passed.');
