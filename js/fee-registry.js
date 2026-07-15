@@ -1,0 +1,66 @@
+const FEE_REGISTRY = Object.freeze([
+  {
+    id:'CCF-000001', standardName:'Visa FANF', category:'assessment', subcategory:'fixed_acquirer_network_fee', bucket:'network', brand:'Visa',
+    aliases:['visa fanf','fanf','fixed acquirer network fee'], frequency:'monthly', negotiable:false, published:true,
+    patterns:[/\bvisa\s+fanf\b/i,/\bfanf\b/i,/\bfixed acquirer network fee\b/i], ruleId:'FT-0001'
+  },
+  {
+    id:'CCF-000002', standardName:'Mastercard NABU Fee', category:'assessment', subcategory:'network_access_brand_usage', bucket:'network', brand:'Mastercard',
+    aliases:['mc nabu','mastercard nabu','master card nabu','network access and brand usage'], frequency:'per_transaction', negotiable:false, published:true,
+    patterns:[/\bmc\s+nabu\b/i,/\bmaster\s*card\s+nabu\b/i,/\bnetwork access(?: and| &) brand usage\b/i], ruleId:'FT-0002'
+  },
+  {
+    id:'CCF-000003', standardName:'Authorization Fee', category:'processor_transaction_fee', subcategory:'authorization', bucket:'processor_revenue', brand:null,
+    aliases:['authorization fee','auth fee','authorization'], frequency:'per_transaction', negotiable:true, published:false,
+    patterns:[/\bauthori[sz]ation fee\b/i,/\bauth fee\b/i], ruleId:'FT-0003'
+  },
+  {
+    id:'CCF-000004', standardName:'PCI Compliance Fee', category:'compliance', subcategory:'pci_compliance', bucket:'processor_revenue', brand:null,
+    aliases:['pci compliance fee','pci fee','pci program fee'], frequency:'monthly_or_annual', negotiable:true, published:false,
+    patterns:[/\bpci compliance(?: fee)?\b/i,/\bpci program fee\b/i,/\bpci fee\b/i], ruleId:'FT-0004'
+  },
+  {
+    id:'CCF-000005', standardName:'PCI Non-Compliance Fee', category:'compliance', subcategory:'pci_non_compliance', bucket:'processor_revenue', brand:null,
+    aliases:['pci non compliance fee','pci non-compliance','non compliant pci fee'], frequency:'monthly', negotiable:true, published:false,
+    patterns:[/\bpci non[- ]?compliance(?: fee)?\b/i,/\bnon[- ]?compliant pci fee\b/i], ruleId:'FT-0005'
+  },
+  {
+    id:'CCF-000006', standardName:'Batch Fee', category:'processor_transaction_fee', subcategory:'batch', bucket:'processor_revenue', brand:null,
+    aliases:['batch fee','settlement fee','batch settlement fee'], frequency:'per_batch', negotiable:true, published:false,
+    patterns:[/\bbatch(?: settlement)? fee\b/i,/\bsettlement fee\b/i], ruleId:'FT-0006'
+  },
+  {
+    id:'CCF-000007', standardName:'Monthly Account Fee', category:'monthly_fee', subcategory:'account_service', bucket:'processor_revenue', brand:null,
+    aliases:['monthly account fee','monthly service fee','account maintenance fee','access fee'], frequency:'monthly', negotiable:true, published:false,
+    patterns:[/\bmonthly account fee\b/i,/\bmonthly service fee\b/i,/\baccount maintenance fee\b/i,/\baccess fee\b/i], ruleId:'FT-0007'
+  },
+  {
+    id:'CCF-000008', standardName:'Gateway Fee', category:'third_party_service', subcategory:'gateway', bucket:'third_party', brand:null,
+    aliases:['gateway fee','payment gateway fee','gateway access fee'], frequency:'monthly_or_transaction', negotiable:true, published:false,
+    patterns:[/\bpayment gateway fee\b/i,/\bgateway access fee\b/i,/\bgateway fee\b/i], ruleId:'FT-0008'
+  },
+  {
+    id:'CCF-000009', standardName:'Equipment Rental Fee', category:'third_party_service', subcategory:'equipment_rental', bucket:'third_party', brand:null,
+    aliases:['equipment rental','terminal rental','device rental','terminal lease'], frequency:'monthly', negotiable:true, published:false,
+    patterns:[/\bequipment rental(?: fee)?\b/i,/\bterminal rental(?: fee)?\b/i,/\bdevice rental(?: fee)?\b/i,/\bterminal lease(?: fee)?\b/i], ruleId:'FT-0009'
+  },
+  {
+    id:'CCF-000010', standardName:'AVS Fee', category:'processor_transaction_fee', subcategory:'avs', bucket:'processor_revenue', brand:null,
+    aliases:['avs fee','address verification fee','address verification service fee'], frequency:'per_transaction', negotiable:true, published:false,
+    patterns:[/\bavs fee\b/i,/\baddress verification(?: service)? fee\b/i], ruleId:'FT-0010'
+  },
+  {
+    id:'CCF-000011', standardName:'Chargeback Fee', category:'chargeback', subcategory:'chargeback', bucket:'processor_revenue', brand:null,
+    aliases:['chargeback fee','chargeback processing fee','dispute fee'], frequency:'per_occurrence', negotiable:true, published:false,
+    patterns:[/\bchargeback(?: processing)? fee\b/i,/\bdispute fee\b/i], ruleId:'FT-0011'
+  },
+  {
+    id:'CCF-000012', standardName:'Annual Fee', category:'annual_fee', subcategory:'annual_account_fee', bucket:'processor_revenue', brand:null,
+    aliases:['annual fee','annual account fee','annual service fee'], frequency:'annual', negotiable:true, published:false,
+    patterns:[/\bannual account fee\b/i,/\bannual service fee\b/i,/\bannual fee\b/i], ruleId:'FT-0012'
+  }
+]);
+
+export function getFeeRegistry(){return FEE_REGISTRY.map(item=>({...item,aliases:[...item.aliases],patterns:[...item.patterns]}));}
+export function getFeeById(id){return FEE_REGISTRY.find(item=>item.id===id)||null;}
+export default FEE_REGISTRY;

@@ -1,3 +1,4 @@
+import {classifyFeeCandidates,summarizeFees} from './fee-intelligence.js';
 const clean = value => String(value ?? '').replace(/\u00a0/g,' ').replace(/[ \t]+/g,' ').trim();
 const normalize = value => clean(value).toLowerCase().replace(/[^a-z0-9]+/g,' ').trim();
 
@@ -109,7 +110,9 @@ export function buildStatementExtraction(record){
   const metadata=extractMetadataFromPages(pages);
   const joined=pages.map(p=>p.text).join('\n');
   const processor=detectProcessor(joined);
-  const fees=extractFeeCandidates(sections);
+  const feeCandidates=extractFeeCandidates(sections);
+  const fees=classifyFeeCandidates(feeCandidates,{processor:processor.name});
+  const feeSummary=summarizeFees(fees);
   const counts=sections.reduce((acc,s)=>{acc[s.type]=(acc[s.type]||0)+1;return acc;},{});
-  return {schemaVersion:'4.1',sourceFile:record.name,pageCount:record.pageCount,metadata,processor,sections,sectionCounts:counts,feeCandidates:fees,extractionLog:[...Object.values(metadata).filter(Boolean),...fees.map(f=>({field:'fee_candidate',value:f.amount,page:f.page,line:f.line,rawText:f.rawText,confidence:f.confidence}))]};
+  return {schemaVersion:'4.2',sourceFile:record.name,pageCount:record.pageCount,metadata,processor,sections,sectionCounts:counts,feeCandidates:fees,feeSummary,unknownFees:fees.filter(f=>f.status==='needs_review'),extractionLog:[...Object.values(metadata).filter(Boolean),...fees.map(f=>({field:'fee_candidate',value:f.amount,page:f.page,line:f.line,rawText:f.rawText,confidence:f.confidence}))]};
 }
