@@ -1,6 +1,6 @@
 import * as pdfjsLib from 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.10.38/pdf.min.mjs';
 import {stableHash,extractPrintedPage,extractStatementPeriod,extractMid,extractMerchantName,detectMissingAndOrder,compareIdentity} from './pdf-validation.js';
-import {buildStatementExtraction} from './statement-extraction.js';
+import {runStatementIntelligencePipeline} from './statement-intelligence-pipeline.js';
 pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.10.38/pdf.worker.min.mjs';
 const state={files:[],results:[],extractions:[],currentScreen:'home'};
 const titles={home:'Home','new-analysis':'New Analysis',validation:'Statement Validation',extraction:'Statement Extraction',history:'History',settings:'Settings'};
@@ -20,9 +20,34 @@ async function validate(){el.continueButton.disabled=true;el.continueButton.text
 document.addEventListener('click',e=>{const b=e.target.closest('[data-screen]');if(b)navigate(b.dataset.screen);});el.pdfInput.addEventListener('change',e=>addFiles(e.target.files));el.clearQueue.onclick=()=>{state.files=[];state.results=[];el.pdfInput.value='';renderQueue();};el.continueButton.onclick=validate;['dragenter','dragover'].forEach(n=>el.dropZone.addEventListener(n,e=>{e.preventDefault();el.dropZone.classList.add('dragover');}));['dragleave','drop'].forEach(n=>el.dropZone.addEventListener(n,e=>{e.preventDefault();el.dropZone.classList.remove('dragover');}));el.dropZone.addEventListener('drop',e=>addFiles(e.dataTransfer.files));
 function displayField(label,item){const value=item?.value||'Not detected';const confidence=item?`${Math.round(item.confidence*100)}%`:'—';const evidence=item?`<details><summary>Evidence</summary><div class="raw-evidence">Page ${item.page}${item.line?`, line ${item.line}`:''}: ${escapeHtml(item.rawText)}</div></details>`:'';return `<article class="result-card"><header><div><strong>${label}</strong><small>${escapeHtml(value)}</small></div><span class="confidence">${confidence}</span></header>${evidence}</article>`;}
 function escapeHtml(value=''){return String(value).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
+function metricRow(label,metric){if(!metric)return'';if(metric.status==='insufficient_evidence')return`<div class="status-row"><span>${escapeHtml(label)}</span><strong>Insufficient evidence</strong></div>`;const raw=metric.value;const v=typeof raw==='number'?(metric.formula==='total_fees / gross_volume'?`${(raw*100).toFixed(3)}%`:metric.type==='integer'?raw.toLocaleString('en-US'):raw.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})):'—';const tag=metric.status==='derived'?' (derived)':'';return`<div class="status-row"><span>${escapeHtml(label)}</span><strong>${escapeHtml(v)}${tag}</strong></div>`;}
+function renderIntelligenceDiagnostic(diagnostic){
+  const diag=$('intelligenceDiagnostic');if(!diag)return;
+  const r=diagnostic.reconciliation,m=diagnostic.metrics;
+  const statusColor={'reconciled':'ok','partially_reconciled':'warning','not_reconciled':'error','insufficient_evidence':'warning'}[r.status]||'warning';
+  const warnCount=diagnostic.warnings.filter(w=>w.severity==='warning'||w.severity==='error').length;
+  diag.innerHTML=`<div class="queue-header"><h3>Sprint 5.0 — Internal Diagnostic</h3></div><div class="status-panel">`+
+    `<div class="status-row"><span>Schema version</span><strong>${escapeHtml(diagnostic.schemaVersion)}</strong></div>`+
+    `<div class="status-row"><span>Overall confidence</span><strong>${Math.round((diagnostic.overallConfidence||0)*100)}%</strong></div>`+
+    `<div class="status-row"><span>Warnings</span><strong>${warnCount?`${warnCount} warning(s)`:'None'}</strong></div>`+
+    `<div class="status-row"><span>Unknown fees queued</span><strong>${diagnostic.unknownFees.length}</strong></div></div>`+
+    `<div class="queue-header"><h3>Merchant Metrics</h3></div><div class="status-panel">`+
+    metricRow('Gross Volume',m.grossVolume)+
+    metricRow('Transaction Count',m.transactionCount)+
+    metricRow('Total Fees',m.totalFees)+
+    metricRow('Effective Rate',m.effectiveRate)+
+    metricRow('Average Ticket',m.averageTicket)+
+    `</div><div class="queue-header"><h3>Reconciliation</h3></div>`+
+    `<div class="notice ${statusColor}"><strong>Status: ${escapeHtml(r.status.replaceAll('_',' '))}</strong>`+
+    (r.feeStatementTotal!==null?`<p>Extracted: $${r.feeExtracted.toFixed(2)} · Statement: $${r.feeStatementTotal.toFixed(2)} · Variance: $${r.feeVariance.toFixed(2)} · Tolerance: $${r.tolerance.toFixed(2)}</p>`:'<p>Statement fee total not found in document; reconciliation cannot be assessed.</p>')+
+    (r.proposalBlocked?`<p><em>Savings and proposal generation blocked: ${escapeHtml(r.blockReason||'reconciliation incomplete')}</em></p>`:'')+
+    `</div>`;
+  if(diagnostic.warnings.length){diag.insertAdjacentHTML('beforeend',`<div class="queue-header"><h3>Warnings</h3></div><div class="status-panel">${diagnostic.warnings.map(w=>`<div class="status-row"><span>${escapeHtml(w.code.replaceAll('_',' '))}</span><strong>${escapeHtml(w.message)}</strong></div>`).join('')}</div>`);}
+}
 function renderExtraction(){
   const metadata=$('metadataResults'),sections=$('sectionResults'),fees=$('feeCandidateResults'),summary=$('extractionSummary');
   metadata.innerHTML='';sections.innerHTML='';fees.innerHTML='';
+  const intelligenceDiag=$('intelligenceDiagnostic');if(intelligenceDiag)intelligenceDiag.innerHTML='';
   const totalSections=state.extractions.reduce((n,x)=>n+x.sections.length,0),totalFees=state.extractions.reduce((n,x)=>n+x.feeCandidates.length,0),classified=state.extractions.reduce((n,x)=>n+(x.feeSummary?.classified||0),0),unknown=state.extractions.reduce((n,x)=>n+(x.feeSummary?.unknown||0),0);
   summary.innerHTML=`<div class="status-row"><span>Statements mapped</span><strong>${state.extractions.length}</strong></div><div class="status-row"><span>Sections detected</span><strong>${totalSections}</strong></div><div class="status-row"><span>Fees found</span><strong>${totalFees}</strong></div><div class="status-row"><span>Classified</span><strong>${classified}</strong></div><div class="status-row"><span>Needs review</span><strong>${unknown}</strong></div>`;
   for(const x of state.extractions){
@@ -42,12 +67,13 @@ function renderExtraction(){
       const detail=classified?`${escapeHtml(f.bucket.replaceAll('_',' '))} · ${escapeHtml(f.category.replaceAll('_',' '))} · Rule ${escapeHtml(f.ruleId)}`:`Needs review · Suggested broad bucket: ${escapeHtml((f.suggestedBucket||'unknown').replaceAll('_',' '))}`;
       fees.insertAdjacentHTML('beforeend',`<article class="result-card"><header><div><strong>${title}</strong><small>$${f.amount.toFixed(2)} · Page ${f.page}, line ${f.line} · ${detail}</small></div><span class="confidence">${Math.round((f.classificationConfidence||0)*100)}%</span></header><details><summary>Original statement evidence</summary><div class="raw-evidence">${escapeHtml(f.rawText)}</div></details></article>`);
     }
+    if(x.metrics)renderIntelligenceDiagnostic(x);
   }
   const notice=$('extractionNotice');
   notice.className='notice warning';
-  notice.innerHTML=`<strong>Sprint 4.4 processor identification complete</strong><p>Processor identification now reports confirmed processor status, rule-pack version, weighted evidence, and safe Generic fallback with review flags when confidence is below threshold. Fee classification behavior remains unchanged.</p>`;
+  notice.innerHTML=`<strong>Sprint 5.0 Statement Intelligence Pipeline active</strong><p>Pipeline orchestrates PDF validation, processor identification, structure discovery, fee classification, merchant metrics, and reconciliation readiness. Internal diagnostic summary shown above. Savings and proposal generation are blocked until reconciliation is confirmed.</p>`;
 }
-async function runExtraction(){if(!el.extractButton)return;el.extractButton.disabled=true;const originalText=el.extractButton.textContent;el.extractButton.textContent='Extracting…';try{state.extractions=await Promise.all(state.results.map(result=>buildStatementExtraction(result)));renderExtraction();navigate('extraction');}catch(error){const notice=$('extractionNotice');notice.className='notice error';notice.innerHTML=`<strong>Statement extraction error</strong><p>${escapeHtml(String(error.message||error))}</p>`;navigate('extraction');}finally{el.extractButton.textContent=originalText;el.extractButton.disabled=el.extractButton.dataset.blocked==='true';}}
+async function runExtraction(){if(!el.extractButton)return;el.extractButton.disabled=true;const originalText=el.extractButton.textContent;el.extractButton.textContent='Extracting…';try{state.extractions=await Promise.all(state.results.map(result=>runStatementIntelligencePipeline(result)));renderExtraction();navigate('extraction');}catch(error){const notice=$('extractionNotice');notice.className='notice error';notice.innerHTML=`<strong>Statement extraction error</strong><p>${escapeHtml(String(error.message||error))}</p>`;navigate('extraction');}finally{el.extractButton.textContent=originalText;el.extractButton.disabled=el.extractButton.dataset.blocked==='true';}}
 if(el.extractButton)el.extractButton.onclick=runExtraction;
 
 renderQueue();navigate('home');
