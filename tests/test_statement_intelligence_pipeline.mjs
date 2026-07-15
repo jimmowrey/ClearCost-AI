@@ -209,8 +209,13 @@ function textPage(index, text, {ocrRequired=false, rotation=0, readable=true, ha
   assert.equal(result.reconciliation.feeStatementTotal, 47.45);
   assert.ok(typeof result.reconciliation.feeExtracted === 'number');
   assert.ok(typeof result.reconciliation.feeVariance === 'number');
-  assert.ok(['reconciled','partially_reconciled','not_reconciled'].includes(result.reconciliation.status));
+  assert.ok(['reconciled','partially_reconciled','not_reconciled','insufficient_evidence'].includes(result.reconciliation.status));
   assert.equal(typeof result.reconciliation.tolerance, 'number');
+  // Separate dimension fields must be present
+  assert.ok('feeReconciliationStatus' in result.reconciliation);
+  assert.ok('overallReconciliationStatus' in result.reconciliation);
+  assert.ok('volumeReconciliationStatus' in result.reconciliation);
+  assert.ok('transactionCountReconciliationStatus' in result.reconciliation);
 }
 
 // --- Insufficient evidence reconciliation ---
@@ -300,6 +305,10 @@ function textPage(index, text, {ocrRequired=false, rotation=0, readable=true, ha
   // Stage 6
   assert.ok(typeof result.reconciliation === 'object');
   assert.ok('status' in result.reconciliation);
+  assert.ok('feeReconciliationStatus' in result.reconciliation);
+  assert.ok('overallReconciliationStatus' in result.reconciliation);
+  assert.ok('volumeReconciliationStatus' in result.reconciliation);
+  assert.ok('transactionCountReconciliationStatus' in result.reconciliation);
   assert.ok('feeExtracted' in result.reconciliation);
   assert.ok('proposalBlocked' in result.reconciliation);
   // Stage 7
