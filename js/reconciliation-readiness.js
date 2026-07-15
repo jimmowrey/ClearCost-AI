@@ -1,9 +1,10 @@
-// Default fee reconciliation tolerance: $0.01.
+// Default fee reconciliation tolerance: $0.01 (1 cent).
 // A larger tolerance may only be applied when toleranceReason, ruleId, and
 // supportingEvidence are all supplied; those fields are then recorded in the result.
+// Rejected custom tolerances are reported explicitly — ClearCost AI has no silent failures.
 export const RECONCILIATION_TOLERANCE = 0.01;
 
-// Fee variance above which feeReconciliationStatus transitions from
+// Fee variance (in dollars) above which feeReconciliationStatus transitions from
 // 'partially_reconciled' to 'not_reconciled'.
 const PARTIAL_FEE_VARIANCE_THRESHOLD = 10.00;
 
@@ -15,6 +16,12 @@ export const RECONCILIATION_STATUS = Object.freeze({
   INSUFFICIENT: 'insufficient_evidence'
 });
 
+// Convert a dollar amount (possibly a floating-point string or number) to an
+// integer number of cents using round-half-up to avoid accumulated FP error.
+function toCents(dollars) {
+  return Math.round(Number(dollars) * 100);
+}
+
 export function assessReconciliation({
   extractedFeeTotal = 0,
   statementFeeTotal = null,
@@ -25,32 +32,63 @@ export function assessReconciliation({
   ruleId = null,
   supportingEvidence = null
 } = {}) {
-  // A tolerance larger than the default is only accepted when all three
-  // provenance fields are provided; otherwise the default $0.01 is used.
-  let effectiveTolerance = RECONCILIATION_TOLERANCE;
+
+  // ── Tolerance validation ──────────────────────────────────────────────────
+  const defaultToleranceCents = toCents(RECONCILIATION_TOLERANCE);
+  const requestedToleranceCents = toCents(tolerance);
+
+  let customToleranceAccepted = false;
+  let toleranceRejectionReason = null;
+  let warningCode = null;
+  const missingProvenanceFields = [];
+
+  let effectiveToleranceCents = defaultToleranceCents;
   let appliedToleranceReason = null;
   let appliedRuleId = null;
   let appliedSupportingEvidence = null;
 
-  if (tolerance > RECONCILIATION_TOLERANCE) {
-    if (toleranceReason && ruleId && supportingEvidence) {
-      effectiveTolerance = parseFloat(Number(tolerance).toFixed(2));
+  if (requestedToleranceCents > defaultToleranceCents) {
+    // Check which provenance fields are missing
+    if (!toleranceReason) missingProvenanceFields.push('toleranceReason');
+    if (!ruleId)          missingProvenanceFields.push('ruleId');
+    if (!supportingEvidence) missingProvenanceFields.push('supportingEvidence');
+
+    if (missingProvenanceFields.length === 0) {
+      // Full provenance supplied — accept the custom tolerance
+      customToleranceAccepted = true;
+      effectiveToleranceCents = requestedToleranceCents;
       appliedToleranceReason = toleranceReason;
       appliedRuleId = ruleId;
       appliedSupportingEvidence = supportingEvidence;
+    } else {
+      // Explicit rejection — never silent
+      customToleranceAccepted = false;
+      toleranceRejectionReason =
+        `Custom tolerance $${Number(tolerance).toFixed(2)} rejected: missing required provenance fields: ${missingProvenanceFields.join(', ')}. Falling back to default $${RECONCILIATION_TOLERANCE.toFixed(2)}.`;
+      warningCode = 'CUSTOM_TOLERANCE_REJECTED';
     }
-    // Without provenance the larger tolerance is silently rejected.
   }
 
-  const extracted = parseFloat(Number(extractedFeeTotal || 0).toFixed(2));
-  const statementTotal = statementFeeTotal !== null ? parseFloat(Number(statementFeeTotal).toFixed(2)) : null;
-  const feeVariance = statementTotal !== null ? parseFloat(Math.abs(extracted - statementTotal).toFixed(2)) : null;
+  const effectiveTolerance = effectiveToleranceCents / 100;
+
+  // ── Integer-cent fee arithmetic ───────────────────────────────────────────
+  const feeExtractedCents = toCents(extractedFeeTotal || 0);
+  const feeStatementTotalCents = statementFeeTotal !== null ? toCents(statementFeeTotal) : null;
+  const feeVarianceCents = feeStatementTotalCents !== null
+    ? Math.abs(feeExtractedCents - feeStatementTotalCents)
+    : null;
+  const toleranceCents = effectiveToleranceCents;
+
+  // Display-value dollars (rounded to 2 dp, derived from integer cents)
+  const feeExtracted = feeExtractedCents / 100;
+  const feeStatementTotal = feeStatementTotalCents !== null ? feeStatementTotalCents / 100 : null;
+  const feeVariance = feeVarianceCents !== null ? feeVarianceCents / 100 : null;
 
   // ── Fee reconciliation dimension ──────────────────────────────────────────
   let feeReconciliationStatus;
-  if (statementTotal === null) {
+  if (feeStatementTotalCents === null) {
     feeReconciliationStatus = RECONCILIATION_STATUS.INSUFFICIENT;
-  } else if (feeVariance <= effectiveTolerance) {
+  } else if (feeVarianceCents <= toleranceCents) {
     feeReconciliationStatus = RECONCILIATION_STATUS.FEE_RECONCILED;
   } else if (feeVariance <= PARTIAL_FEE_VARIANCE_THRESHOLD) {
     feeReconciliationStatus = RECONCILIATION_STATUS.PARTIALLY;
@@ -59,8 +97,8 @@ export function assessReconciliation({
   }
 
   // ── Volume and transaction-count dimensions ───────────────────────────────
-  // These variances cannot yet be computed (no extracted counterpart to compare
-  // against); they remain null until a future extraction stage provides them.
+  // Variances cannot yet be computed; they remain null until a future extraction
+  // stage provides them.
   const transactionCountVariance = null;
   const volumeVariance = null;
   const volumeReconciliationStatus = RECONCILIATION_STATUS.INSUFFICIENT;
@@ -96,21 +134,52 @@ export function assessReconciliation({
     blockReason = 'Volume and transaction count reconciliation data unavailable; overall reconciliation incomplete';
   }
 
+  // ── Build tolerance provenance record ─────────────────────────────────────
+  const toleranceProvenance = requestedToleranceCents > defaultToleranceCents
+    ? {
+        requestedTolerance: requestedToleranceCents / 100,
+        appliedTolerance: effectiveTolerance,
+        customToleranceAccepted,
+        ...(customToleranceAccepted
+          ? { toleranceReason: appliedToleranceReason, ruleId: appliedRuleId, supportingEvidence: appliedSupportingEvidence }
+          : { toleranceRejectionReason, warningCode, missingProvenanceFields }
+        )
+      }
+    : null;
+
   return {
-    feeExtracted: extracted,
-    feeStatementTotal: statementTotal,
+    // Integer-cent values (primary comparison basis)
+    feeExtractedCents,
+    feeStatementTotalCents,
+    feeVarianceCents,
+    toleranceCents,
+
+    // Dollar display values (derived from integer cents)
+    feeExtracted,
+    feeStatementTotal,
     feeVariance,
-    transactionCountVariance,
-    volumeVariance,
-    tolerance: parseFloat(effectiveTolerance.toFixed(2)),
+    tolerance: effectiveTolerance,
+
+    // Tolerance provenance (non-null only when a custom tolerance was requested)
+    toleranceProvenance,
+
+    // Backward-compat individual provenance fields (populated only when accepted)
     toleranceReason: appliedToleranceReason,
     ruleId: appliedRuleId,
     supportingEvidence: appliedSupportingEvidence,
+
+    // Dimension statuses
     feeReconciliationStatus,
     volumeReconciliationStatus,
     transactionCountReconciliationStatus,
     overallReconciliationStatus,
     status: overallReconciliationStatus,  // backward-compat alias
+
+    // Variance fields
+    transactionCountVariance,
+    volumeVariance,
+
+    // Proposal gate
     proposalBlocked,
     blockReason
   };
