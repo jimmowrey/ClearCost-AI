@@ -17,6 +17,9 @@ export class ProcessorDetector{
   async detect(text='',opts={}){
     const fullText=String(text);
     const lines=Array.isArray(opts.lines)&&opts.lines.length?opts.lines.map(clean).filter(Boolean):linesFromText(fullText);
+    const logoText=Array.isArray(opts.logoText)
+      ?opts.logoText.map(clean).filter(Boolean).join('\n')
+      :clean(opts.logoText||'');
     const installedIds=(await this.#loader.getInstalledPacks()).filter(id=>id!=='common'&&id!=='generic');
     const allEvidence=[];
     const results=[];
@@ -32,11 +35,13 @@ export class ProcessorDetector{
 
       if(Array.isArray(behaviors?.detectionPatterns)){
         for(const dp of behaviors.detectionPatterns){
+          const type=dp.type||EVIDENCE_TYPES.WORDING;
           const re=createRegExp(dp);
-          const match=fullText.match(re);
+          const scope=type===EVIDENCE_TYPES.LOGO&&logoText?logoText:fullText;
+          const match=scope.match(re);
           if(match){
             score+=dp.weight||0;
-            evidence.push({type:dp.type||EVIDENCE_TYPES.WORDING,pattern:dp.pattern,match:match[0],weight:dp.weight||0,source:'behaviors'});
+            evidence.push({type,pattern:dp.pattern,match:match[0],weight:dp.weight||0,source:type===EVIDENCE_TYPES.LOGO&&logoText?'logo_text':'behaviors'});
           }
         }
       }
@@ -99,8 +104,11 @@ export class ProcessorDetector{
         detectedProcessorId:best?.processorId||null,
         confidence:best?.confidence??0,
         score:best?.score??0,
+        threshold:best?.threshold??CONFIDENCE_THRESHOLD,
+        strongestCandidate:best?{processor:best.name,processorId:best.processorId,confidence:best.confidence,score:best.score,threshold:best.threshold}:null,
         evidence:allEvidence,
         rulePack:genericPack,
+        requiresReview:true,
         fallback:true,
         fallbackReason:best
           ?`Best candidate '${best.name}' confidence ${best.confidence} is below threshold ${best.threshold}`
@@ -116,8 +124,11 @@ export class ProcessorDetector{
       detectedProcessorId:best.processorId,
       confidence:best.confidence,
       score:best.score,
+      threshold:best.threshold,
+      strongestCandidate:{processor:best.name,processorId:best.processorId,confidence:best.confidence,score:best.score,threshold:best.threshold},
       evidence:allEvidence,
       rulePack:winnerPack,
+      requiresReview:false,
       fallback:false
     };
   }
