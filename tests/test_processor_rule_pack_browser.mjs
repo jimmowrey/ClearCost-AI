@@ -36,12 +36,16 @@ try{
   const extraction=await buildStatementExtraction({name:'browser-sample.pdf',pageCount:1,pages:[{index:1,text:'Worldpay\nMerchant Name: Browser Shop\nMerchant ID: 987654321\nWorldpay Fees\nWorldpay Monthly Service Fee 29.99'}]},{detector});
   assert.equal(extraction.processor.name,'Worldpay');
   assert.equal(extraction.processor.rulePackId,'worldpay');
+  assert.equal(extraction.processor.rulePackVersion,'1.0.0');
+  assert.equal(extraction.processor.fallbackStatus,'confirmed');
   assert.ok(extraction.processor.evidence.length>0);
   assert.ok(extraction.extractionLog.some(entry=>entry.field==='processor_detection'));
   const fallback=await buildStatementExtraction({name:'unknown.pdf',pageCount:1,pages:[{index:1,text:'Merchant Statement\nMerchant Name: Unknown Shop\nMerchant ID: ABC123'}]},{detector});
   assert.equal(fallback.processor.rulePackId,'generic');
-  assert.equal(fallback.processor.name,'Unknown processor');
+  assert.equal(fallback.processor.name,'Generic Processor');
+  assert.equal(fallback.processor.detectedName,'Unknown processor');
   assert.ok(fallback.processor.fallback);
+  assert.ok(fallback.processor.requiresReview);
   console.log('Sprint 4.3 browser integration regression tests passed.');
 } finally {
   await new Promise(resolve=>server.close(resolve));

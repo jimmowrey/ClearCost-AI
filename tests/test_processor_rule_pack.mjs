@@ -109,6 +109,9 @@ assert.equal(rpFallback.rulePack.manifest.id,'generic');
 assert.equal(typeof CONFIDENCE_THRESHOLD,'number');
 assert.ok(CONFIDENCE_THRESHOLD>0&&CONFIDENCE_THRESHOLD<1);
 assert.equal((await detectProcessor('PAYROC merchant statement',{detector})).name,'Payroc');
-assert.equal((await detectProcessor('unbranded statement',{detector})).name,'Unknown processor');
+const unbranded=await detectProcessor('unbranded statement',{detector});
+assert.equal(unbranded.name,'Generic Processor');
+assert.equal(unbranded.detectedName,'Unknown processor');
+assert.ok(unbranded.requiresReview);
 
 console.log('Sprint 4.3 Processor Rule Pack Framework regression tests passed.');

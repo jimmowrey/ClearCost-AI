@@ -82,17 +82,24 @@ export function extractMetadataFromPages(pages=[]){
 
 export async function detectProcessor(text='',options={}){
   const detector=options.detector||defaultProcessorDetector;
-  const result=await detector.detect(text,{mid:options.mid,lines:options.lines});
+  const result=await detector.detect(text,{mid:options.mid,lines:options.lines,logoText:options.logoText});
   return {
-    name:result.fallback?(result.detectedProcessor||'Unknown processor'):result.processor,
+    name:result.processor,
+    processorId:result.processorId,
     detectedName:result.detectedProcessor||result.processor,
+    detectedProcessorId:result.detectedProcessorId||result.processorId||null,
     confidence:result.confidence,
     score:result.score,
+    threshold:result.threshold,
     evidence:result.evidence,
     fallback:result.fallback,
+    fallbackStatus:result.fallback?'fallback':'confirmed',
+    requiresReview:!!result.requiresReview,
     fallbackReason:result.fallbackReason||null,
+    strongestCandidate:result.strongestCandidate||null,
     rulePack:result.rulePack?.manifest?.name||null,
-    rulePackId:result.rulePack?.manifest?.id||null
+    rulePackId:result.rulePack?.manifest?.id||null,
+    rulePackVersion:result.rulePack?.manifest?.version||null
   };
 }
 
@@ -111,11 +118,12 @@ export async function buildStatementExtraction(record,options={}){
   const sections=pages.flatMap(p=>segmentPage(p.text,p.index));
   const metadata=extractMetadataFromPages(pages);
   const joined=pages.map(p=>p.text).join('\n');
-  const processor=await detectProcessor(joined,{detector:options.detector,mid:metadata.merchantId?.value,lines:pages.flatMap(p=>String(p.text||'').split(/\r?\n/))});
+  const logoText=record.logoText||pages.map(p=>p.logoText).filter(Boolean).join('\n');
+  const processor=await detectProcessor(joined,{detector:options.detector,mid:metadata.merchantId?.value,lines:pages.flatMap(p=>String(p.text||'').split(/\r?\n/)),logoText});
   const feeCandidates=extractFeeCandidates(sections);
   const fees=classifyFeeCandidates(feeCandidates,{processor:processor.name});
   const feeSummary=summarizeFees(fees);
   const counts=sections.reduce((acc,s)=>{acc[s.type]=(acc[s.type]||0)+1;return acc;},{});
-  const processorLog=processor.evidence.flatMap(item=>item.evidence.map(evidence=>({field:'processor_detection',value:item.processor,page:1,rawText:evidence.match||evidence.alias||evidence.pattern,confidence:item.confidence,source:evidence.source,type:evidence.type,weight:evidence.weight})));
-  return {schemaVersion:'4.3',sourceFile:record.name,pageCount:record.pageCount,metadata,processor,sections,sectionCounts:counts,feeCandidates:fees,feeSummary,unknownFees:fees.filter(f=>f.status==='needs_review'),extractionLog:[...Object.values(metadata).filter(Boolean),...processorLog,...fees.map(f=>({field:'fee_candidate',value:f.amount,page:f.page,line:f.line,rawText:f.rawText,confidence:f.confidence}))]};
+  const processorLog=processor.evidence.flatMap(item=>item.evidence.map(evidence=>({field:'processor_detection',value:item.processor,page:1,rawText:evidence.match||evidence.alias||evidence.pattern,confidence:item.confidence,source:evidence.source,type:evidence.type,weight:evidence.weight,processorId:item.processorId})));
+  return {schemaVersion:'4.4',sourceFile:record.name,pageCount:record.pageCount,metadata,processor,sections,sectionCounts:counts,feeCandidates:fees,feeSummary,unknownFees:fees.filter(f=>f.status==='needs_review'),extractionLog:[...Object.values(metadata).filter(Boolean),...processorLog,...fees.map(f=>({field:'fee_candidate',value:f.amount,page:f.page,line:f.line,rawText:f.rawText,confidence:f.confidence}))]};
 }
