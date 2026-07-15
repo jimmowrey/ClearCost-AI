@@ -1,0 +1,9 @@
+{
+  "feeAliases": [
+    { "alias": "clover monthly fee",         "canonicalId": "CCF-000007", "weight": 10 },
+    { "alias": "cardpointe gateway fee",     "canonicalId": "CCF-000008", "weight": 10 },
+    { "alias": "first data network fee",     "canonicalId": "CCF-000001", "weight": 10 },
+    { "alias": "fiserv pci fee",             "canonicalId": "CCF-000004", "weight": 10 },
+    { "alias": "first data batch fee",       "canonicalId": "CCF-000006", "weight": 10 }
+  ]
+}

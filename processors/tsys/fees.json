@@ -1,0 +1,12 @@
+{
+  "fees": [
+    {
+      "name":       "TSYS Merchant Insights Fee",
+      "category":   "third_party_service",
+      "subcategory":"analytics_service",
+      "bucket":     "processor_revenue",
+      "frequency":  "monthly",
+      "negotiable": true
+    }
+  ]
+}

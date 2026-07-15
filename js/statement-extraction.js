@@ -1,6 +1,9 @@
 import {classifyFeeCandidates,summarizeFees} from './fee-intelligence.js';
+import {ProcessorRuleLoader} from './processor-rule-loader.js';
+import {ProcessorDetector} from './processor-detector.js';
 const clean = value => String(value ?? '').replace(/\u00a0/g,' ').replace(/[ \t]+/g,' ').trim();
 const normalize = value => clean(value).toLowerCase().replace(/[^a-z0-9]+/g,' ').trim();
+const defaultProcessorDetector=new ProcessorDetector(new ProcessorRuleLoader());
 
 export const SECTION_TYPES = Object.freeze({
   HEADER:'header', MERCHANT:'merchant_information', SUMMARY:'processing_summary',
@@ -77,21 +80,20 @@ export function extractMetadataFromPages(pages=[]){
   };
 }
 
-const processorRules=[
-  {name:'Payroc',patterns:[[/\bpayroc\b/i,60],[/\bsignapay\b/i,25],[/\bmerchant portal.*payroc\b/i,20]]},
-  {name:'Fiserv / First Data',patterns:[[/\bfiserv\b/i,55],[/\bfirst data\b/i,50],[/\bcardpointe\b/i,15],[/\bclover\b/i,15]]},
-  {name:'TSYS',patterns:[[/\btsys\b/i,60],[/\btotal system services\b/i,55],[/\bmerchant insights\b/i,10]]},
-  {name:'Worldpay',patterns:[[/\bworldpay\b/i,60],[/\bfis global\b/i,20],[/\bvantiv\b/i,35]]},
-  {name:'Elavon',patterns:[[/\belavon\b/i,60],[/\bconverge\b/i,15]]},
-  {name:'Global Payments',patterns:[[/\bglobal payments\b/i,60],[/\bheartland payment systems\b/i,45]]},
-  {name:'Square',patterns:[[/\bsquare(?:up)?\b/i,60],[/\bblock inc\b/i,15]]},
-  {name:'Stripe',patterns:[[/\bstripe\b/i,60]]}
-];
-export function detectProcessor(text=''){
-  const evidence=[];let best={name:'Unknown processor',score:0};
-  for(const rule of processorRules){let score=0;const hits=[];for(const [pattern,weight] of rule.patterns){const match=String(text).match(pattern);if(match){score+=weight;hits.push(match[0]);}}if(score>best.score)best={name:rule.name,score};if(hits.length)evidence.push({processor:rule.name,score,hits});}
-  const confidence=Math.min(best.score/60,1);
-  return {name:best.name,confidence:Number(confidence.toFixed(2)),score:best.score,evidence:evidence.sort((a,b)=>b.score-a.score)};
+export async function detectProcessor(text='',options={}){
+  const detector=options.detector||defaultProcessorDetector;
+  const result=await detector.detect(text,{mid:options.mid,lines:options.lines});
+  return {
+    name:result.fallback?(result.detectedProcessor||'Unknown processor'):result.processor,
+    detectedName:result.detectedProcessor||result.processor,
+    confidence:result.confidence,
+    score:result.score,
+    evidence:result.evidence,
+    fallback:result.fallback,
+    fallbackReason:result.fallbackReason||null,
+    rulePack:result.rulePack?.manifest?.name||null,
+    rulePackId:result.rulePack?.manifest?.id||null
+  };
 }
 
 export function extractFeeCandidates(sections=[]){
@@ -104,15 +106,16 @@ export function extractFeeCandidates(sections=[]){
   return candidates;
 }
 
-export function buildStatementExtraction(record){
+export async function buildStatementExtraction(record,options={}){
   const pages=record.pages||[];
   const sections=pages.flatMap(p=>segmentPage(p.text,p.index));
   const metadata=extractMetadataFromPages(pages);
   const joined=pages.map(p=>p.text).join('\n');
-  const processor=detectProcessor(joined);
+  const processor=await detectProcessor(joined,{detector:options.detector,mid:metadata.merchantId?.value,lines:pages.flatMap(p=>String(p.text||'').split(/\r?\n/))});
   const feeCandidates=extractFeeCandidates(sections);
   const fees=classifyFeeCandidates(feeCandidates,{processor:processor.name});
   const feeSummary=summarizeFees(fees);
   const counts=sections.reduce((acc,s)=>{acc[s.type]=(acc[s.type]||0)+1;return acc;},{});
-  return {schemaVersion:'4.2',sourceFile:record.name,pageCount:record.pageCount,metadata,processor,sections,sectionCounts:counts,feeCandidates:fees,feeSummary,unknownFees:fees.filter(f=>f.status==='needs_review'),extractionLog:[...Object.values(metadata).filter(Boolean),...fees.map(f=>({field:'fee_candidate',value:f.amount,page:f.page,line:f.line,rawText:f.rawText,confidence:f.confidence}))]};
+  const processorLog=processor.evidence.flatMap(item=>item.evidence.map(evidence=>({field:'processor_detection',value:item.processor,page:1,rawText:evidence.match||evidence.alias||evidence.pattern,confidence:item.confidence,source:evidence.source,type:evidence.type,weight:evidence.weight})));
+  return {schemaVersion:'4.3',sourceFile:record.name,pageCount:record.pageCount,metadata,processor,sections,sectionCounts:counts,feeCandidates:fees,feeSummary,unknownFees:fees.filter(f=>f.status==='needs_review'),extractionLog:[...Object.values(metadata).filter(Boolean),...processorLog,...fees.map(f=>({field:'fee_candidate',value:f.amount,page:f.page,line:f.line,rawText:f.rawText,confidence:f.confidence}))]};
 }

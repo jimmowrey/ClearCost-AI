@@ -1,0 +1,6 @@
+{
+  "fingerprints": [
+    { "pattern": "payroc merchant portal",       "flags": "i", "weight": 20 },
+    { "pattern": "payroc.*processing statement", "flags": "i", "weight": 15 }
+  ]
+}

@@ -1,0 +1,6 @@
+{
+  "fingerprints": [
+    { "pattern": "fiserv.*merchant statement", "flags": "i", "weight": 15 },
+    { "pattern": "first data.*processing",    "flags": "i", "weight": 15 }
+  ]
+}

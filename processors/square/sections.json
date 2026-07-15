@@ -1,0 +1,6 @@
+{
+  "headings": [
+    { "pattern": "square fees",            "flags": "i", "type": "processor_fees" },
+    { "pattern": "square processing fees", "flags": "i", "type": "processor_fees" }
+  ]
+}

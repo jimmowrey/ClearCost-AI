@@ -1,0 +1,9 @@
+{
+  "feeAliases": [
+    { "alias": "signapay monthly fee",    "canonicalId": "CCF-000007", "weight": 10 },
+    { "alias": "payroc auth fee",         "canonicalId": "CCF-000003", "weight": 10 },
+    { "alias": "merchant portal fee",     "canonicalId": "CCF-000008", "weight": 10 },
+    { "alias": "payroc pci fee",          "canonicalId": "CCF-000004", "weight": 10 },
+    { "alias": "payroc batch fee",        "canonicalId": "CCF-000006", "weight": 10 }
+  ]
+}

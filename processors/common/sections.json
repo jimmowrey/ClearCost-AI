@@ -1,0 +1,11 @@
+{
+  "headings": [
+    { "pattern": "interchange(?: detail)?", "flags": "i", "type": "interchange_detail" },
+    { "pattern": "assessment(?: detail)?", "flags": "i", "type": "assessment_detail" },
+    { "pattern": "deposit summary", "flags": "i", "type": "deposit_summary" },
+    { "pattern": "other fees?", "flags": "i", "type": "processor_fees" },
+    { "pattern": "monthly fees?", "flags": "i", "type": "monthly_fees" },
+    { "pattern": "equipment(?: fees?)?", "flags": "i", "type": "equipment_fees" },
+    { "pattern": "chargebacks?", "flags": "i", "type": "chargebacks" }
+  ]
+}

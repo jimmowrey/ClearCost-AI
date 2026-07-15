@@ -1,0 +1,8 @@
+{
+  "detectionPatterns": [
+    { "type": "wording", "pattern": "merchant statement", "flags": "i", "weight": 5 },
+    { "type": "wording", "pattern": "processing statement", "flags": "i", "weight": 5 },
+    { "type": "wording", "pattern": "merchant services", "flags": "i", "weight": 5 }
+  ],
+  "midFormat": null
+}

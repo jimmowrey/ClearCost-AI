@@ -1,0 +1,8 @@
+{
+  "detectionPatterns": [
+    { "type": "logo",   "pattern": "\\bpayroc\\b",              "flags": "i", "weight": 60 },
+    { "type": "wording","pattern": "\\bsignapay\\b",            "flags": "i", "weight": 25 },
+    { "type": "wording","pattern": "merchant portal.*payroc",   "flags": "i", "weight": 20 }
+  ],
+  "midFormat": "^\\d{12,15}$"
+}

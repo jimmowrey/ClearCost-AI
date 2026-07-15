@@ -1,0 +1,12 @@
+{
+  "fees": [
+    {
+      "name":       "Square Point of Sale Fee",
+      "category":   "third_party_service",
+      "subcategory":"pos_service",
+      "bucket":     "processor_revenue",
+      "frequency":  "monthly",
+      "negotiable": false
+    }
+  ]
+}

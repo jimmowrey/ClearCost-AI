@@ -1,0 +1,7 @@
+{
+  "detectionPatterns": [
+    { "type": "logo",   "pattern": "\\bsquare(?:up)?\\b", "flags": "i", "weight": 60 },
+    { "type": "wording","pattern": "\\bblock inc\\b",     "flags": "i", "weight": 15 }
+  ],
+  "midFormat": "^[A-Z0-9]{8,16}$"
+}

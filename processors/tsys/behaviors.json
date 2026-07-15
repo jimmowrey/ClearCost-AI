@@ -1,0 +1,8 @@
+{
+  "detectionPatterns": [
+    { "type": "logo",   "pattern": "\\btsys\\b",                   "flags": "i", "weight": 60 },
+    { "type": "wording","pattern": "\\btotal system services\\b",  "flags": "i", "weight": 55 },
+    { "type": "wording","pattern": "\\bmerchant insights\\b",      "flags": "i", "weight": 10 }
+  ],
+  "midFormat": "^\\d{12,15}$"
+}

@@ -1,0 +1,8 @@
+{
+  "id": "generic",
+  "name": "Generic Processor",
+  "version": "1.0.0",
+  "description": "Generic fallback rule pack for unrecognized payment processors. Used when processor detection confidence is below threshold.",
+  "confidenceThreshold": 0,
+  "normalizationBase": 60
+}

@@ -1,0 +1,6 @@
+{
+  "fingerprints": [
+    { "pattern": "square.*merchant statement", "flags": "i", "weight": 15 },
+    { "pattern": "squareup.*processing",       "flags": "i", "weight": 15 }
+  ]
+}
