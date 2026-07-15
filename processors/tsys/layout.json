@@ -1,0 +1,6 @@
+{
+  "fingerprints": [
+    { "pattern": "tsys.*merchant statement",              "flags": "i", "weight": 15 },
+    { "pattern": "total system services.*processing",     "flags": "i", "weight": 15 }
+  ]
+}

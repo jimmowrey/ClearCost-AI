@@ -1,0 +1,8 @@
+{
+  "id": "payroc",
+  "name": "Payroc",
+  "version": "1.0.0",
+  "description": "Payroc payment processor rule pack",
+  "confidenceThreshold": 0.5,
+  "normalizationBase": 60
+}

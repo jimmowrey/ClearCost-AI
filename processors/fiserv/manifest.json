@@ -1,0 +1,8 @@
+{
+  "id": "fiserv",
+  "name": "Fiserv / First Data",
+  "version": "1.0.0",
+  "description": "Fiserv and First Data payment processor rule pack",
+  "confidenceThreshold": 0.5,
+  "normalizationBase": 60
+}

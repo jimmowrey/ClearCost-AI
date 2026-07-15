@@ -1,0 +1,9 @@
+{
+  "feeAliases": [
+    { "alias": "worldpay monthly service fee",    "canonicalId": "CCF-000007", "weight": 10 },
+    { "alias": "worldpay chargeback fee",         "canonicalId": "CCF-000011", "weight": 10 },
+    { "alias": "vantiv monthly fee",              "canonicalId": "CCF-000007", "weight": 10 },
+    { "alias": "fis network fee",                 "canonicalId": "CCF-000001", "weight": 10 },
+    { "alias": "worldpay pci compliance fee",     "canonicalId": "CCF-000004", "weight": 10 }
+  ]
+}

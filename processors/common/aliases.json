@@ -1,0 +1,14 @@
+{
+  "feeAliases": [
+    { "alias": "auth fee", "canonicalId": "CCF-000003" },
+    { "alias": "authorization fee", "canonicalId": "CCF-000003" },
+    { "alias": "batch fee", "canonicalId": "CCF-000006" },
+    { "alias": "pci fee", "canonicalId": "CCF-000004" },
+    { "alias": "monthly service fee", "canonicalId": "CCF-000007" },
+    { "alias": "monthly account fee", "canonicalId": "CCF-000007" },
+    { "alias": "gateway fee", "canonicalId": "CCF-000008" },
+    { "alias": "chargeback fee", "canonicalId": "CCF-000011" },
+    { "alias": "avs fee", "canonicalId": "CCF-000010" },
+    { "alias": "annual fee", "canonicalId": "CCF-000012" }
+  ]
+}

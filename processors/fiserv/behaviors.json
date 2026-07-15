@@ -1,0 +1,9 @@
+{
+  "detectionPatterns": [
+    { "type": "logo",   "pattern": "\\bfiserv\\b",      "flags": "i", "weight": 55 },
+    { "type": "logo",   "pattern": "\\bfirst data\\b",  "flags": "i", "weight": 50 },
+    { "type": "wording","pattern": "\\bcardpointe\\b",  "flags": "i", "weight": 15 },
+    { "type": "wording","pattern": "\\bclover\\b",      "flags": "i", "weight": 15 }
+  ],
+  "midFormat": "^\\d{12,16}$"
+}

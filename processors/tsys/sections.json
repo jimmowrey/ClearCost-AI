@@ -1,0 +1,6 @@
+{
+  "headings": [
+    { "pattern": "tsys fees",              "flags": "i", "type": "processor_fees" },
+    { "pattern": "merchant insights fees", "flags": "i", "type": "processor_fees" }
+  ]
+}

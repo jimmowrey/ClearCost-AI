@@ -1,0 +1,6 @@
+{
+  "id": "common",
+  "name": "Common",
+  "version": "1.0.0",
+  "description": "Shared rules and patterns common to all payment processors"
+}

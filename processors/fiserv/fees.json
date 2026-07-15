@@ -1,0 +1,12 @@
+{
+  "fees": [
+    {
+      "name":       "Fiserv Equipment Lease Fee",
+      "category":   "third_party_service",
+      "subcategory":"equipment_rental",
+      "bucket":     "third_party",
+      "frequency":  "monthly",
+      "negotiable": true
+    }
+  ]
+}

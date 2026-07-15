@@ -1,0 +1,9 @@
+{
+  "feeAliases": [
+    { "alias": "tsys monthly service fee",              "canonicalId": "CCF-000007", "weight": 10 },
+    { "alias": "merchant insights access fee",          "canonicalId": "CCF-000008", "weight": 10 },
+    { "alias": "tsys pci compliance fee",               "canonicalId": "CCF-000004", "weight": 10 },
+    { "alias": "tsys batch fee",                        "canonicalId": "CCF-000006", "weight": 10 },
+    { "alias": "total system services annual fee",      "canonicalId": "CCF-000012", "weight": 10 }
+  ]
+}

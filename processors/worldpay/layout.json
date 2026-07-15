@@ -1,0 +1,6 @@
+{
+  "fingerprints": [
+    { "pattern": "worldpay.*merchant statement", "flags": "i", "weight": 15 },
+    { "pattern": "vantiv.*processing",           "flags": "i", "weight": 15 }
+  ]
+}

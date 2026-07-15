@@ -1,0 +1,8 @@
+{
+  "detectionPatterns": [
+    { "type": "logo",   "pattern": "\\bworldpay\\b", "flags": "i", "weight": 60 },
+    { "type": "wording","pattern": "\\bfis global\\b","flags": "i", "weight": 20 },
+    { "type": "wording","pattern": "\\bvantiv\\b",    "flags": "i", "weight": 35 }
+  ],
+  "midFormat": "^\\d{10,16}$"
+}
