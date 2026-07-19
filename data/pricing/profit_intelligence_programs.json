@@ -1,0 +1,38 @@
+{
+  "traditional": {
+    "adjustable": [
+      "merchant_percentage_rate",
+      "merchant_transaction_fee",
+      "merchant_monthly_fee",
+      "merchant_equipment_fee"
+    ]
+  },
+  "cash_discount": {
+    "adjustable": [
+      "cash_discount_percent",
+      "merchant_transaction_fee",
+      "merchant_monthly_fee",
+      "merchant_equipment_fee"
+    ]
+  },
+  "surcharge": {
+    "adjustable": [
+      "customer_surcharge_percent",
+      "merchant_credit_card_rate",
+      "merchant_transaction_fee",
+      "merchant_monthly_fee",
+      "merchant_equipment_fee"
+    ],
+    "default_pairings": [
+      {
+        "customer_surcharge_percent": "3.00",
+        "merchant_credit_card_rate": "0.00"
+      },
+      {
+        "customer_surcharge_percent": "2.00",
+        "merchant_credit_card_rate": "1.50"
+      }
+    ],
+    "note": "Pairings are defaults only. Merchant credit-card rate remains adjustable and must be validated against the selected processor program."
+  }
+}
