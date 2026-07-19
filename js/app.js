@@ -1,9 +1,10 @@
 import * as pdfjsLib from 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.10.38/pdf.min.mjs';
 import {stableHash,extractPrintedPage,extractStatementPeriod,extractMid,extractMerchantName,detectMissingAndOrder,compareIdentity} from './pdf-validation.js';
 import {runStatementIntelligencePipeline} from './statement-intelligence-pipeline.js';
+import './profit-intelligence.js';
 pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.10.38/pdf.worker.min.mjs';
-const state={files:[],results:[],extractions:[],currentScreen:'home'};
-const titles={home:'Home','new-analysis':'New Analysis',validation:'Statement Validation',extraction:'Statement Extraction',history:'History',settings:'Settings'};
+const state={files:[],results:[],extractions:[],profitScenario:null,currentScreen:'home'};
+const titles={home:'Home','new-analysis':'New Analysis',validation:'Statement Validation',extraction:'Statement Extraction',profitability:'Profit Intelligence',history:'History',settings:'Settings'};
 const $=id=>document.getElementById(id);
 const el={pdfInput:$('pdfInput'),dropZone:$('dropZone'),statementQueue:$('statementQueue'),emptyQueue:$('emptyQueue'),statementCount:$('statementCount'),totalSize:$('totalSize'),clearQueue:$('clearQueue'),continueButton:$('continueButton'),fileStatus:$('fileStatus'),validationFiles:$('validationFiles'),validationLoaded:$('validationLoaded'),screenTitle:$('screenTitle'),extractButton:$('extractButton')};
 function navigate(id){if(!$(id))return;document.querySelectorAll('.screen').forEach(s=>s.classList.toggle('active',s.id===id));document.querySelectorAll('.bottom-nav button').forEach(b=>b.classList.toggle('active',b.dataset.screen===id));state.currentScreen=id;el.screenTitle.textContent=titles[id]||'ClearCost AI';window.scrollTo({top:0,behavior:'smooth'});}
@@ -73,7 +74,116 @@ function renderExtraction(){
   notice.className='notice warning';
   notice.innerHTML=`<strong>Sprint 5.0 Statement Intelligence Pipeline active</strong><p>Pipeline orchestrates PDF validation, processor identification, structure discovery, fee classification, merchant metrics, and reconciliation readiness. Internal diagnostic summary shown above. Savings and proposal generation are blocked until reconciliation is confirmed.</p>`;
 }
+
+function firstMetricValue(metric){
+  return metric && typeof metric.value === 'number' ? metric.value : null;
+}
+function currentDiagnostic(){
+  return state.extractions.length ? state.extractions[0] : null;
+}
+function profitNumber(id){
+  const node=$(id);
+  if(!node)return 0;
+  const value=Number(node.value);
+  return Number.isFinite(value)?value:0;
+}
+function selectedProgram(){
+  const node=$('profitProgram');
+  return node?node.value:'traditional';
+}
+function updateProfitFieldVisibility(){
+  const program=selectedProgram();
+  document.querySelectorAll('[data-profit-program]').forEach(node=>{
+    const allowed=(node.dataset.profitProgram||'').split(' ');
+    node.hidden=!allowed.includes(program);
+  });
+}
+function buildProfitScenario(){
+  const PI=window.ClearCostProfitIntelligence;
+  if(!PI)throw new Error('Profit Intelligence browser engine is not loaded.');
+  const d=currentDiagnostic();
+  if(!d)throw new Error('Run statement extraction before Profit Intelligence.');
+  if(d.reconciliation?.proposalBlocked)throw new Error(d.reconciliation.blockReason||'Reconciliation must be confirmed before proposal analysis.');
+
+  const volume=firstMetricValue(d.metrics?.grossVolume);
+  const transactions=firstMetricValue(d.metrics?.transactionCount);
+  const currentExpense=firstMetricValue(d.metrics?.totalFees);
+  if(volume===null||transactions===null||currentExpense===null)throw new Error('Verified volume, transaction count, and total fees are required.');
+
+  const revenue=profitNumber('verifiedRevenue');
+  const cost=profitNumber('verifiedInternalCost');
+  const split=profitNumber('agentSplit');
+  const revenueVerified=$('verifyRevenue')?.checked||false;
+  const costVerified=$('verifyInternalCost')?.checked||false;
+  const splitVerified=$('verifyAgentSplit')?.checked||false;
+  const V=(value,verified,source)=>verified?PI.verifiedValue(value,source):PI.unknownValue(source);
+
+  return {
+    scenarioId:`${d.sourceFile||'statement'}-${selectedProgram()}`,
+    program:selectedProgram(),
+    monthlyVolume:volume,
+    monthlyTransactions:Math.round(transactions),
+    currentMonthlyProcessingExpense:currentExpense,
+    merchantPercentageRate:profitNumber('merchantPercentageRate'),
+    merchantTransactionFee:profitNumber('merchantTransactionFee'),
+    merchantMonthlyFee:profitNumber('merchantMonthlyFee'),
+    merchantEquipmentFee:profitNumber('merchantEquipmentFee'),
+    cashDiscountPercent:selectedProgram()==='cash_discount'?profitNumber('cashDiscountPercent'):null,
+    customerSurchargePercent:selectedProgram()==='surcharge'?profitNumber('customerSurchargePercent'):null,
+    merchantCreditCardRate:selectedProgram()==='surcharge'?profitNumber('merchantCreditCardRate'):null,
+    merchantExpenseComponents:[],
+    revenueComponents:[{name:'Verified program revenue',amount:V(revenue,revenueVerified,'Profit Intelligence input'),category:'program_revenue'}],
+    costComponents:[{name:'Verified processor/internal costs',amount:V(cost,costVerified,'Profit Intelligence input'),category:'processor_cost'}],
+    agentSplitPercent:V(split,splitVerified,'Profit Intelligence input'),
+    minimumMonthlyResidual:profitNumber('minimumResidualProfit')
+  };
+}
+function moneyText(value){return value===null||value===undefined?'Not verified':`$${Number(value).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})}`;}
+function renderProfitResult(result){
+  const PI=window.ClearCostProfitIntelligence;
+  const badge=PI.getProfitBadge(result);
+  const resultNode=$('profitResult');
+  if(!resultNode)return;
+  resultNode.innerHTML=`<div class="notice ${badge.tone==='success'?'ok':badge.tone==='danger'?'error':'warning'}"><strong>${escapeHtml(badge.label)}</strong><p>${result.readyToPresent?'Profit Protection passed. This scenario may proceed to proposal review.':'This scenario is blocked from Ready to Present.'}</p></div>`+
+    `<div class="status-panel"><div class="status-row"><span>Projected merchant expense</span><strong>${moneyText(result.projectedMerchantExpense)}</strong></div><div class="status-row"><span>Projected monthly savings</span><strong>${moneyText(result.projectedMonthlySavings)}</strong></div><div class="status-row"><span>Projected annual savings</span><strong>${moneyText(result.projectedAnnualSavings)}</strong></div><div class="status-row"><span>Internal gross profit pool</span><strong>${moneyText(result.grossProfitPool)}</strong></div><div class="status-row"><span>Projected monthly residual</span><strong>${moneyText(result.projectedMonthlyResidual)}</strong></div><div class="status-row"><span>Ready to Present</span><strong>${result.readyToPresent?'Yes':'No'}</strong></div></div>`+
+    (result.missingVerifiedInputs.length?`<div class="notice warning"><strong>Missing verified inputs</strong><p>${escapeHtml(result.missingVerifiedInputs.join(', '))}</p></div>`:'')+
+    (result.warnings.length?`<div class="notice warning"><strong>Profit Protection</strong><p>${escapeHtml(result.warnings.join(' '))}</p></div>`:'')+
+    `<details><summary>Internal calculation audit</summary><div class="raw-evidence">${result.audit.map(escapeHtml).join('<br>')}</div></details>`;
+}
+function calculateProfitability(){
+  try{
+    state.profitScenario=window.ClearCostProfitIntelligence.calculateProfitScenario(buildProfitScenario());
+    renderProfitResult(state.profitScenario);
+  }catch(error){
+    const resultNode=$('profitResult');
+    if(resultNode)resultNode.innerHTML=`<div class="notice error"><strong>Profit Intelligence blocked</strong><p>${escapeHtml(String(error.message||error))}</p></div>`;
+  }
+}
+function openProfitability(){
+  const d=currentDiagnostic();
+  const resultNode=$('profitResult');
+  if(!d){
+    if(resultNode)resultNode.innerHTML='<div class="notice warning"><strong>No statement analysis available</strong><p>Validate and extract a statement first.</p></div>';
+  }else if(d.reconciliation?.proposalBlocked){
+    if(resultNode)resultNode.innerHTML=`<div class="notice error"><strong>Proposal analysis blocked</strong><p>${escapeHtml(d.reconciliation.blockReason||'Statement reconciliation is incomplete.')}</p></div>`;
+  }else{
+    if($('profitVolume'))$('profitVolume').textContent=moneyText(firstMetricValue(d.metrics?.grossVolume));
+    if($('profitTransactions'))$('profitTransactions').textContent=firstMetricValue(d.metrics?.transactionCount)?.toLocaleString('en-US')||'Not verified';
+    if($('profitCurrentExpense'))$('profitCurrentExpense').textContent=moneyText(firstMetricValue(d.metrics?.totalFees));
+  }
+  updateProfitFieldVisibility();
+  navigate('profitability');
+}
+
 async function runExtraction(){if(!el.extractButton)return;el.extractButton.disabled=true;const originalText=el.extractButton.textContent;el.extractButton.textContent='Extracting…';try{state.extractions=await Promise.all(state.results.map(result=>runStatementIntelligencePipeline(result)));renderExtraction();navigate('extraction');}catch(error){const notice=$('extractionNotice');notice.className='notice error';notice.innerHTML=`<strong>Statement extraction error</strong><p>${escapeHtml(String(error.message||error))}</p>`;navigate('extraction');}finally{el.extractButton.textContent=originalText;el.extractButton.disabled=el.extractButton.dataset.blocked==='true';}}
 if(el.extractButton)el.extractButton.onclick=runExtraction;
+
+
+const profitOpenButton=$('openProfitabilityButton');
+if(profitOpenButton)profitOpenButton.onclick=openProfitability;
+const profitCalculateButton=$('calculateProfitButton');
+if(profitCalculateButton)profitCalculateButton.onclick=calculateProfitability;
+const profitProgram=$('profitProgram');
+if(profitProgram)profitProgram.onchange=updateProfitFieldVisibility;
 
 renderQueue();navigate('home');

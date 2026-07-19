@@ -12,7 +12,7 @@
 <header class="topbar"><div><div class="eyebrow">ClearCost AI</div><h1 id="screenTitle">Home</h1></div><button class="icon-button" type="button" data-screen="settings" aria-label="Open settings">⚙</button></header>
 <main>
 <section id="home" class="screen active">
-<div class="hero"><span class="version">ClearCost AI v1.0 Development · Build 4.1</span><h2>Merchant statement analysis from your phone.</h2><p>Import one or more statements, verify the files, and prepare them for processing.</p></div>
+<div class="hero"><span class="version">ClearCost AI v1.0 Development · Sprint 5.2</span><h2>Merchant statement analysis from your phone.</h2><p>Import statements, validate the data, analyze costs, and protect proposal profitability.</p></div>
 <button class="primary action-card" type="button" data-screen="new-analysis"><span class="action-icon">＋</span><span><strong>New Analysis</strong><small>Import merchant statement PDFs</small></span></button>
 <button class="secondary action-card" type="button" data-screen="history"><span class="action-icon">▣</span><span><strong>History</strong><small>Open saved analyses</small></span></button>
 <button class="secondary action-card" type="button" data-screen="settings"><span class="action-icon">⚙</span><span><strong>Settings</strong><small>Consultant and application preferences</small></span></button>
@@ -27,13 +27,12 @@
 <button id="continueButton" class="primary full-width" type="button" disabled>Validate Statements</button>
 </section>
 <section id="validation" class="screen">
-<div class="section-intro"><h2>Statement Validation</h2><p>Build 3 verifies document integrity. Build 4.1 maps statement sections and extracts identity metadata.</p></div>
+<div class="section-intro"><h2>Statement Validation</h2><p>Document integrity and statement identity validation.</p></div>
 <div id="validationFiles" class="statement-queue"></div>
 <div class="status-panel"><div class="status-row"><span>Files loaded</span><strong id="validationLoaded">0</strong></div><div class="status-row"><span>Page count</span><strong id="pageCountStatus">Waiting</strong></div><div class="status-row"><span>Text layers</span><strong id="textLayerStatus">Waiting</strong></div><div class="status-row"><span>OCR required</span><strong id="ocrRequiredStatus">Waiting</strong></div><div class="status-row"><span>Statement period</span><strong id="periodStatus">Waiting</strong></div><div class="status-row"><span>Merchant / MID</span><strong id="merchantStatus">Waiting</strong></div><div class="status-row"><span>Missing pages</span><strong id="missingStatus">Waiting</strong></div><div class="status-row"><span>Duplicate pages</span><strong id="duplicateStatus">Waiting</strong></div><div class="status-row"><span>Rotated pages</span><strong id="rotationStatus">Waiting</strong></div><div class="status-row"><span>Readability</span><strong id="readabilityStatus">Waiting</strong></div><div class="status-row"><span>Page order</span><strong id="orderStatus">Waiting</strong></div></div>
 <div id="validationNotice" class="notice"><strong>Validation not started</strong><p>Select statements and run validation.</p></div>
 <button id="extractButton" class="primary full-width" type="button" disabled>Extract Statement Structure</button><button class="secondary full-width" type="button" data-screen="new-analysis">Back to Statement Queue</button>
 </section>
-
 <section id="extraction" class="screen">
 <div class="section-intro"><h2>Statement Extraction</h2><p>Sprint 5.0 Statement Intelligence Pipeline maps sections, classifies fees, extracts merchant metrics, and assesses reconciliation readiness.</p></div>
 <div id="extractionSummary" class="status-panel"></div>
@@ -42,7 +41,36 @@
 <div class="queue-header"><h3>Fee Candidates</h3></div><div id="feeCandidateResults" class="result-list"></div>
 <div id="intelligenceDiagnostic"></div>
 <div id="extractionNotice" class="notice"><strong>Extraction not started</strong><p>Run statement validation first.</p></div>
+<button id="openProfitabilityButton" class="primary full-width" type="button">Open Profit Intelligence</button>
 <button class="secondary full-width" type="button" data-screen="validation">Back to Validation</button>
+</section>
+<section id="profitability" class="screen">
+<div class="section-intro"><h2>Profit Intelligence</h2><p>Internal consultant analysis. Profit, processor costs, splits, and residuals are never included in merchant-facing documents.</p></div>
+<div class="status-panel"><div class="status-row"><span>Verified monthly volume</span><strong id="profitVolume">Not loaded</strong></div><div class="status-row"><span>Verified transactions</span><strong id="profitTransactions">Not loaded</strong></div><div class="status-row"><span>Current processing expense</span><strong id="profitCurrentExpense">Not loaded</strong></div></div>
+<div class="settings-card">
+<label>Program<select id="profitProgram"><option value="traditional">Traditional / IC+</option><option value="cash_discount">Cash Discount</option><option value="surcharge">Surcharge</option></select></label>
+<label data-profit-program="traditional">Merchant percentage rate (%)<input id="merchantPercentageRate" type="number" value="0" min="0" step="0.01"></label>
+<label>Per-transaction fee ($)<input id="merchantTransactionFee" type="number" value="0.10" min="0" step="0.01"></label>
+<label>Monthly fee ($)<input id="merchantMonthlyFee" type="number" value="0" min="0" step="1"></label>
+<label>Equipment fee ($)<input id="merchantEquipmentFee" type="number" value="0" min="0" step="1"></label>
+<label data-profit-program="cash_discount">Cash Discount (%)<input id="cashDiscountPercent" type="number" value="3.50" min="0" step="0.25"></label>
+<label data-profit-program="surcharge">Customer surcharge (%)<input id="customerSurchargePercent" type="number" value="3.00" min="0" step="0.25"></label>
+<label data-profit-program="surcharge">Merchant credit-card rate (%)<input id="merchantCreditCardRate" type="number" value="0" min="0" step="0.01"></label>
+</div>
+<div class="queue-header"><h3>Internal Profit Inputs</h3></div>
+<div class="settings-card">
+<label>Verified program revenue ($)<input id="verifiedRevenue" type="number" value="0" step="0.01"></label>
+<label><input id="verifyRevenue" type="checkbox"> Revenue input verified</label>
+<label>Verified processor / internal costs ($)<input id="verifiedInternalCost" type="number" value="0" step="0.01"></label>
+<label><input id="verifyInternalCost" type="checkbox"> Cost input verified</label>
+<label>Agent split (%)<input id="agentSplit" type="number" value="80" min="0" max="100" step="1"></label>
+<label><input id="verifyAgentSplit" type="checkbox"> Agent split verified</label>
+<label>Minimum monthly residual ($)<input id="minimumResidualProfit" type="number" value="500" min="0" step="25"></label>
+</div>
+<div class="notice"><strong>Profit Protection</strong><p>Ready to Present remains blocked until required internal economics are verified and the scenario meets the minimum residual requirement.</p></div>
+<button id="calculateProfitButton" class="primary full-width" type="button">Calculate Profitability</button>
+<div id="profitResult"></div>
+<button class="secondary full-width" type="button" data-screen="extraction">Back to Statement Extraction</button>
 </section>
 <section id="history" class="screen"><div class="section-intro"><h2>History</h2><p>Saved analyses will appear here after statement storage is connected.</p></div><div class="empty-state">No saved analyses yet.</div></section>
 <section id="settings" class="screen"><div class="section-intro"><h2>Settings</h2><p>Consultant details and profitability settings will be stored here.</p></div><div class="settings-card"><label>Consultant name<input type="text" value="Jim Mowrey"></label><label>Phone<input type="tel" value="530-720-6690"></label><label>Email<input type="email" value="jimmowrey@comcast.net"></label><label>Minimum monthly residual<input type="number" value="500" min="0" step="25"></label></div><div class="notice"><strong>Merchant data separation</strong><p>Consultant settings remain separate from merchant-facing reports.</p></div></section>
