@@ -104,15 +104,178 @@ export async function detectProcessor(text='',options={}){
 }
 
 export function extractFeeCandidates(sections=[]){
-  const feeTypes=new Set([SECTION_TYPES.INTERCHANGE,SECTION_TYPES.ASSESSMENTS,SECTION_TYPES.FEES,SECTION_TYPES.MONTHLY,SECTION_TYPES.EQUIPMENT,SECTION_TYPES.CHARGEBACKS,SECTION_TYPES.ADJUSTMENTS]);
+  const feeTypes=new Set([
+    SECTION_TYPES.INTERCHANGE,
+    SECTION_TYPES.ASSESSMENTS,
+    SECTION_TYPES.FEES,
+    SECTION_TYPES.MONTHLY,
+    SECTION_TYPES.EQUIPMENT,
+    SECTION_TYPES.CHARGEBACKS,
+    SECTION_TYPES.ADJUSTMENTS
+  ]);
+
   const amountPattern=/(?:\$\s*)?(-?\d{1,3}(?:,\d{3})*\.\d{2})\s*$/;
+  const formulaPattern=/\b(?:times|disc(?:ount)?\s+rate\s+times|transactions?\s+at|x\s+trns)\b/i;
+  const feeKeywordPattern=/\b(?:fee|assessment|discount|interchange|dues|avs|acquirer|license|monthly|equipment|chargeback|retrieval|adjustment)\b/i;
+
   const candidates=[];
+
   for(const section of sections.filter(s=>feeTypes.has(s.type))){
-    section.lines.forEach((line,index)=>{const match=line.match(amountPattern);if(!match)return;const amount=Number(match[1].replace(/,/g,''));const description=clean(line.slice(0,match.index));if(!description||Number.isNaN(amount))return;candidates.push({originalDescription:description,amount,page:section.page,line:section.startLine+index,section:section.type,rawText:line,confidence:description.length>2?.82:.55,status:'unclassified'});});
-  }
-  return candidates;
+    const consumed=new Set();
+
+    for(let index=0;index<section.lines.length;index++){
+      if(consumed.has(index)) continue;
+
+      const line=clean(section.lines[index]);
+      if(!line) continue;
+
+      // Reconstruct processor fee rows that PDF extraction split
+      // across multiple text lines.
+      if(formulaPattern.test(line) && feeKeywordPattern.test(line)){
+        const rowLines=[line];
+        const monetaryValues=[];
+
+        const firstAmount=line.match(amountPattern);
+        if(firstAmount){
+          monetaryValues.push({
+            index,
+            amount:Number(firstAmount[1].replace(/,/g,''))
+          });
+        }
+
+        // Fiserv and similar layouts frequently split one fee row
+        // across the next several PDF text lines.
+        for(let offset=1;offset<=4;offset++){
+          const nextIndex=index+offset;
+          if(nextIndex>=section.lines.length) break;
+
+          const nextLine=clean(section.lines[nextIndex]);
+          if(!nextLine) continue;
+
+          // Stop if another clear fee description begins.
+          if(
+            offset>1 &&
+            feeKeywordPattern.test(nextLine) &&
+            formulaPattern.test(nextLine)
+          ){
+            break;
+          }
+
+          rowLines.push(nextLine);
+
+          const amountMatch=nextLine.match(amountPattern);
+          if(amountMatch){
+            monetaryValues.push({
+              index:nextIndex,
+              amount:Number(amountMatch[1].replace(/,/g,''))
+            });
+          }
+        }
+
+        // Formula rows commonly contain a calculation basis followed
+        // by the actual charged fee. Use the last monetary value found.
+        if(monetaryValues.length>=2){
+          const reconstructedText=rowLines.join(' ');
+          
+let calculatedAmount=null;
+
+// Handles PDF splits such as:
+// 0.0014 TIMES $8 400.05  -> $8,400.05 × 0.0014
+const splitVolumeFormula=reconstructedText.match(
+  /(\d*\.?\d+)\s+(?:disc(?:ount)?\s+rate\s+)?times\s+\$\s*(\d{1,3})\s+(\d{3}\.\d{2})/i
+);
+
+if(splitVolumeFormula){
+  const rate=Number(splitVolumeFormula[1]);
+  const volume=Number(`${splitVolumeFormula[2]}${splitVolumeFormula[3]}`);
+  calculatedAmount=Math.round(rate*volume*100)/100;
 }
 
+// Handles formulas already extracted intact:
+// 0.00165 TIMES $311.79
+if(calculatedAmount===null){
+  const volumeFormula=reconstructedText.match(
+    /(\d*\.?\d+)\s+(?:disc(?:ount)?\s+rate\s+)?times\s+\$\s*([\d,]+\.\d{2})/i
+  );
+
+  if(volumeFormula){
+    const rate=Number(volumeFormula[1]);
+    const volume=Number(volumeFormula[2].replace(/,/g,''));
+    calculatedAmount=Math.round(rate*volume*100)/100;
+  }
+}
+
+// Handles transaction formulas:
+// 13 TRANSACTIONS AT 0.01
+if(calculatedAmount===null){
+  const transactionFormula=reconstructedText.match(
+    /(\d+)\s+(?:transactions?|trns)\s+at\s+\$?\s*(\d*\.?\d+)/i
+  );
+
+  if(transactionFormula){
+    const count=Number(transactionFormula[1]);
+    const unitFee=Number(transactionFormula[2]);
+    calculatedAmount=Math.round(count*unitFee*100)/100;
+  }
+}
+
+const actualFee=
+  calculatedAmount!==null
+    ? {index:monetaryValues[monetaryValues.length-1].index,amount:calculatedAmount}
+    : monetaryValues[monetaryValues.length-1];
+
+          candidates.push({
+            originalDescription:line,
+            amount:actualFee.amount,
+            page:section.page,
+            line:section.startLine+index,
+            section:section.type,
+            rawText:rowLines.join(' '),
+            confidence:.9,
+            status:'unclassified',
+            extractionMethod:'reconstructed_formula_row'
+          });
+
+          // Prevent continuation amounts from becoming duplicate candidates.
+          for(let i=index;i<=actualFee.index;i++){
+            consumed.add(i);
+          }
+
+          continue;
+        }
+      }
+
+      // Standard single-line fee extraction.
+      const match=line.match(amountPattern);
+      if(!match) continue;
+
+      const amount=Number(match[1].replace(/,/g,''));
+      const description=clean(line.slice(0,match.index));
+
+      if(!description || Number.isNaN(amount)) continue;
+      // Formula-style rows must be resolved by row reconstruction.
+// Never treat their trailing calculation basis as the charged fee.
+if(formulaPattern.test(description)) continue;
+
+      // Bare numeric lines are not independently trustworthy fee rows.
+      if(!feeKeywordPattern.test(description)) continue;
+
+      candidates.push({
+        originalDescription:description,
+        amount,
+        page:section.page,
+        line:section.startLine+index,
+        section:section.type,
+        rawText:line,
+        confidence:description.length>2?.82:.55,
+        status:'unclassified',
+        extractionMethod:'single_line_fee'
+      });
+    }
+  }
+
+  return candidates;
+}
 export async function buildStatementExtraction(record,options={}){
   const pages=record.pages||[];
   const sections=pages.flatMap(p=>segmentPage(p.text,p.index));
