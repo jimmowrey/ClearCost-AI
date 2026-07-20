@@ -16,8 +16,46 @@ function setText(id,text){$(id).textContent=text;}
 async function inspectPage(page,index){const textContent=await page.getTextContent();const text=textContent.items.map(item=>item.str).join('\n').trim();const hasText=text.replace(/\s/g,'').length>=20;const printed=extractPrintedPage(text);const viewport=page.getViewport({scale:1});const rotation=((viewport.rotation%360)+360)%360;const charCount=text.replace(/\s/g,'').length;const readable=hasText?charCount>=35:true;const fingerprint=stableHash(text.replace(/\s+/g,' ').trim().toLowerCase()||`image-page-${index}-${viewport.width}x${viewport.height}`);return {index,text,hasText,ocrRequired:!hasText,printed,rotation,readable,charCount,fingerprint};}
 async function inspectFile(file){const bytes=new Uint8Array(await file.arrayBuffer());const pdf=await pdfjsLib.getDocument({data:bytes}).promise;const pages=[];for(let i=1;i<=pdf.numPages;i++)pages.push(await inspectPage(await pdf.getPage(i),i));const joined=pages.map(p=>p.text).join('\n');const duplicates=[];const hashes=new Map();for(const p of pages){if(hashes.has(p.fingerprint))duplicates.push([hashes.get(p.fingerprint),p.index]);else hashes.set(p.fingerprint,p.index);}const sequence=detectMissingAndOrder(pages.map(p=>p.printed));return {name:file.name,pageCount:pdf.numPages,pages,period:extractStatementPeriod(joined),mid:extractMid(joined),merchant:extractMerchantName(joined),duplicates,missing:sequence.missing,outOfOrder:sequence.outOfOrder,expectedTotal:sequence.expectedTotal};}
 function summarize(){const allPages=state.results.flatMap(r=>r.pages);const identity=compareIdentity(state.results);const total=allPages.length,ocr=allPages.filter(p=>p.ocrRequired).length,rotated=allPages.filter(p=>p.rotation!==0).map(p=>p.index),unreadable=allPages.filter(p=>!p.readable).map(p=>p.index);const missing=state.results.flatMap(r=>r.missing.map(p=>`${r.name}: ${p}`));const duplicates=state.results.flatMap(r=>r.duplicates.map(([a,b])=>`${r.name}: ${a}/${b}`));const order=state.results.flatMap(r=>r.outOfOrder.map(p=>`${r.name}: ${p}`));setText('pageCountStatus',`${total} page${total===1?'':'s'}`);setText('textLayerStatus',`${total-ocr} of ${total} pages`);setText('ocrRequiredStatus',ocr?`${ocr} page${ocr===1?'':'s'}`:'No');setText('periodStatus',identity.periodMatch?(identity.periods.length?'Match':'Not detected'):'Mismatch');setText('merchantStatus',identity.midMatch&&identity.merchantMatch?((identity.mids.length||identity.merchants.length)?'Match':'Not detected'):'Mismatch');setText('missingStatus',missing.length?missing.join('; '):'None detected');setText('duplicateStatus',duplicates.length?duplicates.join('; '):'None detected');setText('rotationStatus',rotated.length?`${rotated.length} page(s)`:'None');setText('readabilityStatus',unreadable.length?`${unreadable.length} page(s) need review`:'Pass');setText('orderStatus',order.length?order.join('; '):'Pass');const errors=[!identity.periodMatch,!identity.midMatch,!identity.merchantMatch,missing.length,order.length].filter(Boolean).length;const warnings=[ocr,duplicates.length,rotated.length,unreadable.length,!identity.periods.length,!identity.mids.length&&!identity.merchants.length].filter(Boolean).length;const notice=$('validationNotice');notice.className=`notice ${errors?'error':warnings?'warning':'ok'}`;notice.innerHTML=errors?`<strong>Validation failed</strong><p>${errors} blocking issue(s) found. Fee analysis must not continue until resolved.</p>`:warnings?`<strong>Review required</strong><p>No blocking identity or page-sequence mismatch was found, but ${warnings} warning category(s) require review.</p>`:`<strong>Validation passed</strong><p>Document integrity checks passed. The statements are ready for the next extraction stage.</p>`;setText('pageValidationStatus',errors?'Failed':warnings?'Review required':'Passed');if(el.extractButton){el.extractButton.disabled=!!errors;el.extractButton.dataset.blocked=errors?'true':'false';}setText('identityStatus',identity.periodMatch&&identity.midMatch&&identity.merchantMatch?'Passed':'Failed');setText('ocrStatus',ocr?`${ocr} page(s) require OCR`:'Text layer available');}
-function renderValidation(){el.validationFiles.innerHTML='';el.validationLoaded.textContent=state.results.length;for(const r of state.results){const card=document.createElement('article');card.className='file-card';const issues=r.missing.length+r.duplicates.length+r.outOfOrder.length+r.pages.filter(p=>p.rotation!==0||!p.readable).length;card.innerHTML=`<div><strong></strong><small>${r.pageCount} page(s) · ${r.pages.filter(p=>p.ocrRequired).length} OCR-required · ${issues?`${issues} issue(s)`:'validated'}</small></div><span aria-hidden="true">${issues?'⚠':'✓'}</span>`;card.querySelector('strong').textContent=r.name;el.validationFiles.append(card);}summarize();}
-async function validate(){el.continueButton.disabled=true;el.continueButton.textContent='Validating…';setText('pageValidationStatus','Reading PDF pages');try{state.results=[];for(const file of state.files)state.results.push(await inspectFile(file));renderValidation();navigate('validation');}catch(error){const notice=$('validationNotice');notice.className='notice error';notice.innerHTML=`<strong>PDF validation error</strong><p>${String(error.message||error)}</p>`;navigate('validation');}finally{el.continueButton.disabled=!state.files.length;el.continueButton.textContent='Validate Statements';}}
+function renderValidation(){
+  el.validationFiles.innerHTML='';
+  el.validationLoaded.textContent=state.results.length;
+
+  for(const r of state.results){
+    const card=document.createElement('article');
+    card.className='file-card';
+
+    const issues=
+      r.missing.length+
+      r.duplicates.length+
+      r.outOfOrder.length+
+      r.pages.filter(p=>p.rotation!==0||!p.readable).length;
+
+    const periodText=
+      !r.period
+        ? 'Not detected'
+        : r.period==='__mixed_periods__'
+          ? 'Multiple conflicting periods detected'
+          : r.period;
+
+    card.innerHTML=
+      `<div>
+        <strong></strong>
+        <small>
+          ${r.pageCount} page(s) ·
+          ${r.pages.filter(p=>p.ocrRequired).length} OCR-required ·
+          ${issues?`${issues} issue(s)`:'validated'}
+          <br>Detected period: ${periodText}
+          <br>Extracted date text: ${r.pages.map(p=>p.text).join(' ').match(/.{0,60}(?:statement|processing|period|date).{0,100}/ig)?.slice(0,5).join(' | ') || 'No relevant date text found'}
+        </small>
+      </div>
+      <span aria-hidden="true">${issues?'⚠':'✓'}</span>`;
+
+    card.querySelector('strong').textContent=r.name;
+    el.validationFiles.append(card);
+  }
+
+  summarize();
+}async function validate(){el.continueButton.disabled=true;el.continueButton.textContent='Validating…';setText('pageValidationStatus','Reading PDF pages');try{state.results=[];for(const file of state.files)state.results.push(await inspectFile(file));renderValidation();navigate('validation');}catch(error){const notice=$('validationNotice');notice.className='notice error';notice.innerHTML=`<strong>PDF validation error</strong><p>${String(error.message||error)}</p>`;navigate('validation');}finally{el.continueButton.disabled=!state.files.length;el.continueButton.textContent='Validate Statements';}}
 document.addEventListener('click',e=>{const b=e.target.closest('[data-screen]');if(b)navigate(b.dataset.screen);});el.pdfInput.addEventListener('change',e=>addFiles(e.target.files));el.clearQueue.onclick=()=>{state.files=[];state.results=[];el.pdfInput.value='';renderQueue();};el.continueButton.onclick=validate;['dragenter','dragover'].forEach(n=>el.dropZone.addEventListener(n,e=>{e.preventDefault();el.dropZone.classList.add('dragover');}));['dragleave','drop'].forEach(n=>el.dropZone.addEventListener(n,e=>{e.preventDefault();el.dropZone.classList.remove('dragover');}));el.dropZone.addEventListener('drop',e=>addFiles(e.dataTransfer.files));
 function displayField(label,item){const value=item?.value||'Not detected';const confidence=item?`${Math.round(item.confidence*100)}%`:'—';const evidence=item?`<details><summary>Evidence</summary><div class="raw-evidence">Page ${item.page}${item.line?`, line ${item.line}`:''}: ${escapeHtml(item.rawText)}</div></details>`:'';return `<article class="result-card"><header><div><strong>${label}</strong><small>${escapeHtml(value)}</small></div><span class="confidence">${confidence}</span></header>${evidence}</article>`;}
 function escapeHtml(value=''){return String(value).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}

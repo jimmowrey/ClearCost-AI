@@ -13,25 +13,151 @@ export function extractPrintedPage(text=''){
   return null;
 }
 
-function canonicalDateRange(match){
-  if(!match) return null;
-  return normalize(match[0]);
+function normalizeYear(year){
+  const y=Number(year);
+  if(!Number.isFinite(y)) return null;
+  return y<100 ? 2000+y : y;
+}
+
+function monthKey(month,year){
+  const m=Number(month);
+  const y=normalizeYear(year);
+  if(!y || m<1 || m>12) return null;
+  return `${y}-${String(m).padStart(2,'0')}`;
+}
+
+function monthNameNumber(name=''){
+  const months={
+    jan:1,january:1,
+    feb:2,february:2,
+    mar:3,march:3,
+    apr:4,april:4,
+    may:5,
+    jun:6,june:6,
+    jul:7,july:7,
+    aug:8,august:8,
+    sep:9,sept:9,september:9,
+    oct:10,october:10,
+    nov:11,november:11,
+    dec:12,december:12
+  };
+  return months[String(name).toLowerCase()]||null;
+}
+
+function unique(values){
+  return [...new Set(values.filter(Boolean))];
 }
 
 function findAllStatementPeriods(text=''){
-  const patterns=[
-    /(?:statement|processing)\s*(?:period|dates?)\s*[:\-]?\s*([A-Za-z]{3,9}\s+\d{1,2},?\s+\d{4})\s*(?:to|through|-)\s*([A-Za-z]{3,9}\s+\d{1,2},?\s+\d{4})/ig,
-    /\b(0?[1-9]|1[0-2])[\/-](0?[1-9]|[12]\d|3[01])[\/-](20\d{2})\s*(?:to|through|-)\s*(0?[1-9]|1[0-2])[\/-](0?[1-9]|[12]\d|3[01])[\/-](20\d{2})\b/ig
-  ];
+  const headerText=text.slice(0,5000);
 
-  const found=[];
-  for(const pattern of patterns){
-    for(const match of text.matchAll(pattern)){
-      const canonical=canonicalDateRange(match);
-      if(canonical) found.push(canonical);
+  // Priority 1:
+  // Explicit numeric monthly ranges:
+  // 01/01/25 - 01/31/25
+  // 2/1/26 through 2/28/26
+  const numericRanges=[];
+  const numericRangePattern=
+    /\b(0?[1-9]|1[0-2])[\/-](0?[1-9]|[12]\d|3[01])[\/-](\d{2}|\d{4})\s*(?:to|through|-)\s*(0?[1-9]|1[0-2])[\/-](0?[1-9]|[12]\d|3[01])[\/-](\d{2}|\d{4})\b/ig;
+
+  for(const match of headerText.matchAll(numericRangePattern)){
+    const startMonth=Number(match[1]);
+    const startYear=normalizeYear(match[3]);
+    const endMonth=Number(match[4]);
+    const endYear=normalizeYear(match[6]);
+
+    // A monthly statement normally stays within one calendar month.
+    if(startMonth===endMonth && startYear===endYear){
+      numericRanges.push(monthKey(startMonth,startYear));
     }
   }
-  return [...new Set(found)];
+
+  // Prefer ranges when the statement contains an explicit period/service label.
+  if(
+    numericRanges.length &&
+    /\b(statement\s*(?:period|dates?)|processing\s*(?:period|dates?)|service\s+from)\b/i.test(text)
+  ){
+    return unique(numericRanges);
+  }
+
+  // Priority 2:
+  // Written month date ranges:
+  // January 1, 2025 to January 31, 2025
+  const writtenRanges=[];
+  const writtenRangePattern=
+    /\b([A-Za-z]{3,9})\s+\d{1,2},?\s+(\d{4})\s*(?:to|through|-)\s*([A-Za-z]{3,9})\s+\d{1,2},?\s+(\d{4})\b/ig;
+
+  for(const match of text.matchAll(writtenRangePattern)){
+    const startMonth=monthNameNumber(match[1]);
+    const endMonth=monthNameNumber(match[3]);
+    const startYear=Number(match[2]);
+    const endYear=Number(match[4]);
+
+    if(startMonth && startMonth===endMonth && startYear===endYear){
+      writtenRanges.push(monthKey(startMonth,startYear));
+    }
+  }
+
+  if(writtenRanges.length) return unique(writtenRanges);
+
+  // Priority 3:
+  // Explicit month labels:
+  // Statement for the month: March 2026
+  // Statement Month: March 2026
+  // Statement Period: March 2026
+  const labeledMonths=[];
+  const labeledMonthPattern=
+    /(?:statement\s*(?:for\s+the\s+month|month|period|date)|processing\s*(?:month|period|date))\s*[:\-]?\s*([A-Za-z]{3,9})\s+(\d{4})/ig;
+
+  for(const match of text.matchAll(labeledMonthPattern)){
+    labeledMonths.push(monthKey(monthNameNumber(match[1]),match[2]));
+  }
+
+  if(labeledMonths.length) return unique(labeledMonths);
+
+  // Priority 4:
+  // Statement-date formats used as the month indicator:
+  // Statement Date: 02/28/2026
+  // Statement Date: 06/30/2024
+  const statementDates=[];
+  const numericStatementDate=
+    /statement\s*date\s*[:\-]?\s*(0?[1-9]|1[0-2])[\/-](0?[1-9]|[12]\d|3[01])[\/-](\d{2}|\d{4})/ig;
+
+  for(const match of headerText.matchAll(numericStatementDate)){
+    statementDates.push(monthKey(match[1],match[3]));
+  }
+
+  const writtenStatementDate=
+    /(?:statement\s*date|billing\s+statement\s+for)\s*[:\-]?\s*([A-Za-z]{3,9})\s+\d{1,2},?\s+(\d{4})/ig;
+
+  for(const match of headerText.matchAll(writtenStatementDate)){
+    statementDates.push(monthKey(monthNameNumber(match[1]),match[2]));
+  }
+
+  if(statementDates.length) return unique(statementDates);
+
+  // Priority 5:
+  // Generic monthly range fallback when the PDF text order separates
+  // "Statement Period" from its value, as seen in some Fiserv statements.
+  if(numericRanges.length) return unique(numericRanges);
+
+  // Priority 6:
+  // Bare month/year such as "May 2025".
+  // Restrict this fallback to the beginning of the statement to reduce
+  // false matches from notices and card-brand updates later in the PDF.
+  const bareMonths=[];
+  const bareMonthPattern=
+    /\b(January|February|March|April|May|June|July|August|September|October|November|December)\s+(\d{4})\b/ig;
+
+  for(const match of headerText.slice(0,1500).matchAll(bareMonthPattern)){
+    bareMonths.push(monthKey(monthNameNumber(match[1]),match[2]));
+  }
+
+  const distinctBareMonths=unique(bareMonths);
+
+  // Only trust a bare month/year when it points to one unambiguous month.
+  if(distinctBareMonths.length===1) return distinctBareMonths;
+
+  return [];
 }
 
 export function extractStatementPeriod(text=''){
