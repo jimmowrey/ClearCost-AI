@@ -115,44 +115,180 @@ export function extractFeeCandidates(sections=[]){
   ]);
 
   const amountPattern=/(?:\$\s*)?(-?\d{1,3}(?:,\d{3})*\.\d{2})\s*$/;
-  const formulaPattern=/\b(?:times|disc(?:ount)?\s+rate\s+times|transactions?\s+at|x\s+trns)\b/i;
-  const feeKeywordPattern=/\b(?:fee|assessment|discount|interchange|dues|avs|acquirer|license|monthly|equipment|chargeback|retrieval|adjustment)\b/i;
+
+  const formulaPattern=
+    /\b(?:times|disc(?:ount)?\s+rate\s+times|transactions?\s+at|x\s+trns)\b/i;
+
+  const feeKeywordPattern=
+    /\b(?:fee|assessment|discount|interchange|dues|avs|acquirer|license|monthly|equipment|chargeback|retrieval|adjustment)\b/i;
+
+  const salesDiscountPattern=
+    /\b(?:VISA|MASTERCARD|DISCOVER)?\s*(?:DEBIT\s+)?SALES\s+(?:DISC|DISCOUNT)\b/i;
+
+  const interchangeChargeLabelPattern=
+    /^interchange charges?$/i;
 
   const candidates=[];
 
-  for(const section of sections.filter(s=>feeTypes.has(s.type))){
+  /*
+   * ============================================================
+   * INTERCHANGE DETAIL ROW EXTRACTION
+   * ============================================================
+   *
+   * North State Power Sports / Commerce Control statements
+   * commonly extract interchange rows as:
+   *
+   *   VI-US REGULATED (DB)
+   *   Interchange charges
+   *   -$1.98
+   *
+   * The PDF text layer may not preserve all visible table columns.
+   * We therefore capture every confirmed component we actually have
+   * and explicitly preserve missing components as null.
+   *
+   * Never infer volume, transaction count, percentage rate, or
+   * per-transaction interchange when the PDF extraction did not
+   * provide those values.
+   */
+
+  for(const section of sections.filter(
+    s=>s.type===SECTION_TYPES.INTERCHANGE
+  )){
+    const lines=section.lines.map(clean);
+
+    for(let index=0;index<lines.length;index++){
+      const description=lines[index];
+
+      if(!description) continue;
+
+      const nextLine=clean(lines[index+1]||'');
+      const amountLine=clean(lines[index+2]||'');
+
+      if(
+        interchangeChargeLabelPattern.test(nextLine) &&
+        amountPattern.test(amountLine)
+      ){
+        const amountMatch=amountLine.match(amountPattern);
+
+        if(!amountMatch) continue;
+
+        const amount=Math.abs(
+          Number(amountMatch[1].replace(/,/g,''))
+        );
+
+        /*
+         * Ignore obvious headings as interchange descriptions.
+         */
+        if(
+          /^interchange charges?$/i.test(description) ||
+          /^visa$/i.test(description) ||
+          /^mastercard$/i.test(description) ||
+          /^discover$/i.test(description)
+        ){
+          continue;
+        }
+
+        candidates.push({
+          originalDescription:description,
+          amount,
+          page:section.page,
+          line:section.startLine+index,
+          section:section.type,
+
+          rawText:[
+            description,
+            nextLine,
+            amountLine
+          ].join(' '),
+
+          confidence:.96,
+          status:'unclassified',
+
+          extractionMethod:'interchange_description_charge_pair',
+
+          /*
+           * Preserve interchange components separately.
+           *
+           * These remain null unless they are explicitly present
+           * in the extracted PDF text. Do not estimate them.
+           */
+          interchangeDetails:{
+            description,
+            volume:null,
+            transactionCount:null,
+            percentRate:null,
+            perTransactionRate:null,
+            interchangeCharge:amount
+          }
+        });
+
+        /*
+         * Skip the "Interchange charges" label and amount because
+         * they have now been consumed as part of this row.
+         */
+        index+=2;
+      }
+    }
+  }
+
+  /*
+   * ============================================================
+   * NON-INTERCHANGE FEE EXTRACTION
+   * ============================================================
+   */
+
+  for(const section of sections.filter(
+    s=>feeTypes.has(s.type) &&
+       s.type!==SECTION_TYPES.INTERCHANGE
+  )){
     const consumed=new Set();
 
     for(let index=0;index<section.lines.length;index++){
       if(consumed.has(index)) continue;
 
       const line=clean(section.lines[index]);
+
       if(!line) continue;
 
-      // Reconstruct processor fee rows that PDF extraction split
-      // across multiple text lines.
+      /*
+       * ----------------------------------------------------------
+       * Reconstruct formula-based fee rows split across PDF lines.
+       * ----------------------------------------------------------
+       */
+
       if(formulaPattern.test(line) && feeKeywordPattern.test(line)){
         const rowLines=[line];
         const monetaryValues=[];
 
         const firstAmount=line.match(amountPattern);
+
         if(firstAmount){
           monetaryValues.push({
             index,
-            amount:Number(firstAmount[1].replace(/,/g,''))
+            amount:Number(
+              firstAmount[1].replace(/,/g,'')
+            )
           });
         }
 
-        // Fiserv and similar layouts frequently split one fee row
-        // across the next several PDF text lines.
+        /*
+         * Processor statements frequently split one logical fee
+         * row across the next several extracted text lines.
+         */
         for(let offset=1;offset<=4;offset++){
           const nextIndex=index+offset;
+
           if(nextIndex>=section.lines.length) break;
 
-          const nextLine=clean(section.lines[nextIndex]);
+          const nextLine=clean(
+            section.lines[nextIndex]
+          );
+
           if(!nextLine) continue;
 
-          // Stop if another clear fee description begins.
+          /*
+           * Stop when another clear formula fee begins.
+           */
           if(
             offset>1 &&
             feeKeywordPattern.test(nextLine) &&
@@ -163,81 +299,241 @@ export function extractFeeCandidates(sections=[]){
 
           rowLines.push(nextLine);
 
-          const amountMatch=nextLine.match(amountPattern);
+          const amountMatch=
+            nextLine.match(amountPattern);
+
           if(amountMatch){
             monetaryValues.push({
               index:nextIndex,
-              amount:Number(amountMatch[1].replace(/,/g,''))
+              amount:Number(
+                amountMatch[1].replace(/,/g,'')
+              )
             });
           }
         }
 
-        // Formula rows commonly contain a calculation basis followed
-        // by the actual charged fee. Use the last monetary value found.
-        if(monetaryValues.length>=2){
-          const reconstructedText=rowLines.join(' ');
-          
-let calculatedAmount=null;
+        const reconstructedText=
+          rowLines.join(' ');
 
-// Handles PDF splits such as:
-// 0.0014 TIMES $8 400.05  -> $8,400.05 × 0.0014
-const splitVolumeFormula=reconstructedText.match(
-  /(\d*\.?\d+)\s+(?:disc(?:ount)?\s+rate\s+)?times\s+\$\s*(\d{1,3})\s+(\d{3}\.\d{2})/i
-);
+        /*
+         * Explicit charged amount.
+         *
+         * Example:
+         * Fees -$0.65
+         * Service charges -$19.10
+         * Program Fees -$4.52
+         */
+        const explicitChargedFeeMatch=
+          reconstructedText.match(
+            /(?:Program Fees|Service charges|Fees)\s+(-?\$\s*[\d,]+\.\d{2})/i
+          );
 
-if(splitVolumeFormula){
-  const rate=Number(splitVolumeFormula[1]);
-  const volume=Number(`${splitVolumeFormula[2]}${splitVolumeFormula[3]}`);
-  calculatedAmount=Math.round(rate*volume*100)/100;
-}
+        const explicitChargedFee=
+          explicitChargedFeeMatch
+            ? Number(
+                explicitChargedFeeMatch[1]
+                  .replace(/\$/g,'')
+                  .replace(/,/g,'')
+                  .replace(/\s/g,'')
+              )
+            : null;
 
-// Handles formulas already extracted intact:
-// 0.00165 TIMES $311.79
-if(calculatedAmount===null){
-  const volumeFormula=reconstructedText.match(
-    /(\d*\.?\d+)\s+(?:disc(?:ount)?\s+rate\s+)?times\s+\$\s*([\d,]+\.\d{2})/i
-  );
+        let calculatedAmount=null;
 
-  if(volumeFormula){
-    const rate=Number(volumeFormula[1]);
-    const volume=Number(volumeFormula[2].replace(/,/g,''));
-    calculatedAmount=Math.round(rate*volume*100)/100;
-  }
-}
+        /*
+         * --------------------------------------------------------
+         * Volume formula split by PDF extraction.
+         *
+         * Example:
+         * 0.0014 TIMES $8 400.05
+         * becomes:
+         * $8,400.05 × 0.0014
+         * --------------------------------------------------------
+         */
 
-// Handles transaction formulas:
-// 13 TRANSACTIONS AT 0.01
-if(calculatedAmount===null){
-  const transactionFormula=reconstructedText.match(
-    /(\d+)\s+(?:transactions?|trns)\s+at\s+\$?\s*(\d*\.?\d+)/i
-  );
+        const splitVolumeFormula=
+          reconstructedText.match(
+            /(\d*\.?\d+)\s+(?:disc(?:ount)?\s+rate\s+)?times\s+\$\s*(\d{1,3})\s+(\d{3}\.\d{2})/i
+          );
 
-  if(transactionFormula){
-    const count=Number(transactionFormula[1]);
-    const unitFee=Number(transactionFormula[2]);
-    calculatedAmount=Math.round(count*unitFee*100)/100;
-  }
-}
+        if(splitVolumeFormula){
+          const rate=
+            Number(splitVolumeFormula[1]);
 
-const actualFee=
-  calculatedAmount!==null
-    ? {index:monetaryValues[monetaryValues.length-1].index,amount:calculatedAmount}
-    : monetaryValues[monetaryValues.length-1];
+          const volume=
+            Number(
+              `${splitVolumeFormula[2]}${splitVolumeFormula[3]}`
+            );
+
+          calculatedAmount=
+            Math.round(
+              rate*volume*100
+            )/100;
+        }
+
+        /*
+         * --------------------------------------------------------
+         * Standard intact volume formula.
+         *
+         * Example:
+         * 0.0014 TIMES $22640.35
+         * --------------------------------------------------------
+         */
+
+        if(calculatedAmount===null){
+          const volumeFormula=
+            reconstructedText.match(
+              /(\d*\.?\d+)\s+(?:disc(?:ount)?\s+rate\s+)?times\s+\$\s*([\d,]+\.\d{2})/i
+            );
+
+          if(volumeFormula){
+            const rate=
+              Number(volumeFormula[1]);
+
+            const volume=
+              Number(
+                volumeFormula[2]
+                  .replace(/,/g,'')
+              );
+
+            calculatedAmount=
+              Math.round(
+                rate*volume*100
+              )/100;
+          }
+        }
+
+        /*
+         * --------------------------------------------------------
+         * Transaction fee formula.
+         *
+         * Example:
+         * 42 TRANSACTIONS AT 0.0155
+         * --------------------------------------------------------
+         */
+
+        if(calculatedAmount===null){
+          const transactionFormula=
+            reconstructedText.match(
+              /(\d+)\s+(?:transactions?|trns)\s+at\s+\$?\s*(\d*\.?\d+)/i
+            );
+
+          if(transactionFormula){
+            const count=
+              Number(transactionFormula[1]);
+
+            const unitFee=
+              Number(transactionFormula[2]);
+
+            calculatedAmount=
+              Math.round(
+                count*unitFee*100
+              )/100;
+          }
+        }
+
+        /*
+         * Prefer an explicitly printed charged amount.
+         * Otherwise use the verified formula calculation.
+         * Otherwise use the final extracted monetary value.
+         */
+
+        let actualFee=null;
+
+        if(explicitChargedFee!==null){
+          actualFee={
+            index:
+              monetaryValues.length
+                ? monetaryValues[
+                    monetaryValues.length-1
+                  ].index
+                : index,
+
+            amount:
+              Math.abs(explicitChargedFee)
+          };
+        }
+        else if(calculatedAmount!==null){
+          actualFee={
+            index:
+              monetaryValues.length
+                ? monetaryValues[
+                    monetaryValues.length-1
+                  ].index
+                : index,
+
+            amount:
+              calculatedAmount
+          };
+        }
+        else if(monetaryValues.length){
+          actualFee=
+            monetaryValues[
+              monetaryValues.length-1
+            ];
+        }
+
+        if(actualFee){
+          const isSalesDiscount=
+            salesDiscountPattern.test(line);
 
           candidates.push({
             originalDescription:line,
-            amount:actualFee.amount,
+
+            amount:
+              Math.abs(actualFee.amount),
+
             page:section.page,
-            line:section.startLine+index,
+
+            line:
+              section.startLine+index,
+
             section:section.type,
-            rawText:rowLines.join(' '),
-            confidence:.9,
-            status:'unclassified',
-            extractionMethod:'reconstructed_formula_row'
+
+            rawText:
+              reconstructedText,
+
+            confidence:
+              explicitChargedFee!==null
+                ? .98
+                : calculatedAmount!==null
+                  ? .92
+                  : .75,
+
+            status:
+              isSalesDiscount
+                ? 'needs_review'
+                : 'unclassified',
+
+            extractionMethod:
+              explicitChargedFee!==null
+                ? 'reconstructed_explicit_charge'
+                : calculatedAmount!==null
+                  ? 'reconstructed_formula_calculation'
+                  : 'reconstructed_formula_row',
+
+            /*
+             * Sales Discount is deliberately NOT interpreted here.
+             * We know the line and amount exist, but its economic
+             * meaning remains unresolved.
+             */
+            requiresManualReview:
+              isSalesDiscount,
+
+            reviewReason:
+              isSalesDiscount
+                ? 'Sales Discount meaning not yet confirmed'
+                : null
           });
 
-          // Prevent continuation amounts from becoming duplicate candidates.
-          for(let i=index;i<=actualFee.index;i++){
+          /*
+           * Prevent continuation lines from becoming duplicate fees.
+           */
+          for(
+            let i=index;
+            i<=actualFee.index;
+            i++
+          ){
             consumed.add(i);
           }
 
@@ -245,31 +541,98 @@ const actualFee=
         }
       }
 
-      // Standard single-line fee extraction.
-      const match=line.match(amountPattern);
+      /*
+       * ----------------------------------------------------------
+       * Standard single-line fee extraction.
+       * ----------------------------------------------------------
+       */
+
+      const match=
+        line.match(amountPattern);
+
       if(!match) continue;
 
-      const amount=Number(match[1].replace(/,/g,''));
-      const description=clean(line.slice(0,match.index));
+      const amount=
+        Number(
+          match[1].replace(/,/g,'')
+        );
 
-      if(!description || Number.isNaN(amount)) continue;
-      // Formula-style rows must be resolved by row reconstruction.
-// Never treat their trailing calculation basis as the charged fee.
-if(formulaPattern.test(description)) continue;
+      const description=
+        clean(
+          line.slice(
+            0,
+            match.index
+          )
+        );
 
-      // Bare numeric lines are not independently trustworthy fee rows.
-      if(!feeKeywordPattern.test(description)) continue;
+      if(
+        !description ||
+        Number.isNaN(amount)
+      ){
+        continue;
+      }
+
+      /*
+       * Formula rows must be resolved above.
+       * Never treat the calculation basis as the charged fee.
+       */
+      if(
+        formulaPattern.test(description)
+      ){
+        continue;
+      }
+
+      /*
+       * Bare numeric lines are not trustworthy standalone fees.
+       */
+      if(
+        !feeKeywordPattern.test(description)
+      ){
+        continue;
+      }
+
+      const isSalesDiscount=
+        salesDiscountPattern.test(description);
 
       candidates.push({
-        originalDescription:description,
-        amount,
-        page:section.page,
-        line:section.startLine+index,
-        section:section.type,
-        rawText:line,
-        confidence:description.length>2?.82:.55,
-        status:'unclassified',
-        extractionMethod:'single_line_fee'
+        originalDescription:
+          description,
+
+        amount:
+          Math.abs(amount),
+
+        page:
+          section.page,
+
+        line:
+          section.startLine+index,
+
+        section:
+          section.type,
+
+        rawText:
+          line,
+
+        confidence:
+          description.length>2
+            ? .82
+            : .55,
+
+        status:
+          isSalesDiscount
+            ? 'needs_review'
+            : 'unclassified',
+
+        extractionMethod:
+          'single_line_fee',
+
+        requiresManualReview:
+          isSalesDiscount,
+
+        reviewReason:
+          isSalesDiscount
+            ? 'Sales Discount meaning not yet confirmed'
+            : null
       });
     }
   }
