@@ -74,6 +74,7 @@ function formatBytes(bytes) {
   if (!bytes) return '0 KB';
 
   const u = ['B', 'KB', 'MB', 'GB'];
+
   const i = Math.min(
     Math.floor(Math.log(bytes) / Math.log(1024)),
     u.length - 1
@@ -82,7 +83,8 @@ function formatBytes(bytes) {
   return `${(bytes / 1024 ** i).toFixed(i ? 2 : 0)} ${u[i]}`;
 }
 
-const fileKey = f => `${f.name}-${f.size}-${f.lastModified}`;
+const fileKey = f =>
+  `${f.name}-${f.size}-${f.lastModified}`;
 
 function addFiles(list) {
   for (
@@ -92,13 +94,18 @@ function addFiles(list) {
         f.name.toLowerCase().endsWith('.pdf')
     )
   ) {
-    if (!state.files.some(x => fileKey(x) === fileKey(file))) {
+    if (
+      !state.files.some(
+        x => fileKey(x) === fileKey(file)
+      )
+    ) {
       state.files.push(file);
     }
   }
 
   state.results = [];
   state.extractions = [];
+
   renderQueue();
 }
 
@@ -106,7 +113,9 @@ function renderQueue() {
   el.statementQueue.innerHTML = '';
 
   for (const file of state.files) {
-    const card = document.createElement('article');
+    const card =
+      document.createElement('article');
+
     card.className = 'file-card';
 
     card.innerHTML = `
@@ -114,93 +123,236 @@ function renderQueue() {
         <strong></strong>
         <small>${formatBytes(file.size)} · Ready for validation</small>
       </div>
-      <button class="remove-file" type="button" aria-label="Remove file">×</button>
+      <button
+        class="remove-file"
+        type="button"
+        aria-label="Remove file"
+      >×</button>
     `;
 
-    card.querySelector('strong').textContent = file.name;
+    card.querySelector('strong').textContent =
+      file.name;
 
     card.querySelector('button').onclick = () => {
-      state.files = state.files.filter(
-        f => fileKey(f) !== fileKey(file)
-      );
+      state.files =
+        state.files.filter(
+          f =>
+            fileKey(f) !==
+            fileKey(file)
+        );
 
       state.results = [];
       state.extractions = [];
+
       renderQueue();
     };
 
     el.statementQueue.append(card);
   }
 
-  el.statementCount.textContent = state.files.length;
+  el.statementCount.textContent =
+    state.files.length;
 
-  el.totalSize.textContent = formatBytes(
-    state.files.reduce((s, f) => s + f.size, 0)
-  );
+  el.totalSize.textContent =
+    formatBytes(
+      state.files.reduce(
+        (s, f) => s + f.size,
+        0
+      )
+    );
 
-  el.emptyQueue.hidden = !!state.files.length;
-  el.clearQueue.disabled = !state.files.length;
-  el.continueButton.disabled = !state.files.length;
+  el.emptyQueue.hidden =
+    !!state.files.length;
 
-  el.fileStatus.textContent = state.files.length
-    ? `${state.files.length} PDF file${state.files.length === 1 ? '' : 's'} loaded`
-    : 'Waiting for statement selection';
+  el.clearQueue.disabled =
+    !state.files.length;
+
+  el.continueButton.disabled =
+    !state.files.length;
+
+  el.fileStatus.textContent =
+    state.files.length
+      ? `${state.files.length} PDF file${state.files.length === 1 ? '' : 's'} loaded`
+      : 'Waiting for statement selection';
 }
 
 function setText(id, text) {
   $(id).textContent = text;
 }
 
+function countMeaningfulTextCharacters(text) {
+  return String(text || '')
+    .replace(/\s/g, '')
+    .replace(/[.\-_,;:'"`~|/\\()[\]{}]/g, '')
+    .length;
+}
+
+async function inspectPageGraphics(page) {
+  try {
+    const operatorList =
+      await page.getOperatorList();
+
+    const OPS =
+      pdfjsLib.OPS || {};
+
+    let imageCount = 0;
+    let paintCount = 0;
+
+    for (
+      const fn of
+      operatorList.fnArray || []
+    ) {
+      if (
+        fn === OPS.paintImageXObject ||
+        fn === OPS.paintInlineImageXObject ||
+        fn === OPS.paintImageMaskXObject ||
+        fn === OPS.paintSolidColorImageMask
+      ) {
+        imageCount += 1;
+      }
+
+      if (
+        fn === OPS.paintImageXObject ||
+        fn === OPS.paintInlineImageXObject ||
+        fn === OPS.paintImageMaskXObject ||
+        fn === OPS.paintSolidColorImageMask ||
+        fn === OPS.stroke ||
+        fn === OPS.fill ||
+        fn === OPS.eoFill ||
+        fn === OPS.fillStroke ||
+        fn === OPS.eoFillStroke ||
+        fn === OPS.shadingFill
+      ) {
+        paintCount += 1;
+      }
+    }
+
+    return {
+      imageCount,
+      paintCount
+    };
+
+  } catch (error) {
+    console.warn(
+      'Unable to inspect page graphics:',
+      error
+    );
+
+    return {
+      imageCount: 0,
+      paintCount: 0
+    };
+  }
+}
+
 async function inspectPage(page, index) {
-  const textContent = await page.getTextContent();
+  const textContent =
+    await page.getTextContent();
 
-  const text = textContent.items
-    .map(item => item.str)
-    .join('\n')
-    .trim();
+  const text =
+    textContent.items
+      .map(item => item.str)
+      .join('\n')
+      .trim();
 
-  const hasText = text.replace(/\s/g, '').length >= 20;
-  const printed = extractPrintedPage(text);
-  const viewport = page.getViewport({ scale: 1 });
+  const rawCharCount =
+    text.replace(/\s/g, '').length;
+
+  const meaningfulCharCount =
+    countMeaningfulTextCharacters(text);
+
+  const printed =
+    extractPrintedPage(text);
+
+  const viewport =
+    page.getViewport({
+      scale: 1
+    });
 
   const rotation =
     ((viewport.rotation % 360) + 360) % 360;
 
-  const charCount =
-    text.replace(/\s/g, '').length;
+  const graphics =
+    await inspectPageGraphics(page);
+
+  const hasMeaningfulText =
+    meaningfulCharCount >= 20;
+
+  const hasSomeMeaningfulText =
+    meaningfulCharCount > 0;
+
+  const hasImageContent =
+    graphics.imageCount > 0;
+
+  const blankNonDataPage =
+    !hasSomeMeaningfulText &&
+    !hasImageContent;
+
+  const ocrRequired =
+    !hasMeaningfulText &&
+    hasImageContent;
+
+  const hasText =
+    hasMeaningfulText;
 
   const readable =
-    hasText ? charCount >= 35 : true;
+    blankNonDataPage ||
+    hasSomeMeaningfulText ||
+    hasImageContent;
 
-  const fingerprint = stableHash(
-    text.replace(/\s+/g, ' ').trim().toLowerCase() ||
-      `image-page-${index}-${viewport.width}x${viewport.height}`
-  );
+  const fingerprintSource =
+    text
+      .replace(/\s+/g, ' ')
+      .trim()
+      .toLowerCase();
+
+  const fingerprint =
+    stableHash(
+      fingerprintSource ||
+      (
+        blankNonDataPage
+          ? `blank-page-${index}-${viewport.width}x${viewport.height}`
+          : `image-page-${index}-${viewport.width}x${viewport.height}-${graphics.imageCount}`
+      )
+    );
 
   return {
     index,
     text,
     hasText,
-    ocrRequired: !hasText,
+    ocrRequired,
+    blankNonDataPage,
     printed,
     rotation,
     readable,
-    charCount,
+    charCount: rawCharCount,
+    meaningfulCharCount,
+    imageCount: graphics.imageCount,
+    paintCount: graphics.paintCount,
     fingerprint
   };
 }
 
 async function inspectFile(file) {
-  const bytes = new Uint8Array(
-    await file.arrayBuffer()
-  );
+  const bytes =
+    new Uint8Array(
+      await file.arrayBuffer()
+    );
 
   const pdf =
-    await pdfjsLib.getDocument({ data: bytes }).promise;
+    await pdfjsLib
+      .getDocument({
+        data: bytes
+      })
+      .promise;
 
   const pages = [];
 
-  for (let i = 1; i <= pdf.numPages; i++) {
+  for (
+    let i = 1;
+    i <= pdf.numPages;
+    i++
+  ) {
     pages.push(
       await inspectPage(
         await pdf.getPage(i),
@@ -210,17 +362,30 @@ async function inspectFile(file) {
   }
 
   const joined =
-    pages.map(p => p.text).join('\n');
+    pages
+      .map(p => p.text)
+      .join('\n');
 
   const duplicates = [];
   const hashes = new Map();
 
   for (const p of pages) {
-    if (hashes.has(p.fingerprint)) {
+    if (p.blankNonDataPage) {
+      continue;
+    }
+
+    if (
+      hashes.has(
+        p.fingerprint
+      )
+    ) {
       duplicates.push([
-        hashes.get(p.fingerprint),
+        hashes.get(
+          p.fingerprint
+        ),
         p.index
       ]);
+
     } else {
       hashes.set(
         p.fingerprint,
@@ -229,30 +394,49 @@ async function inspectFile(file) {
     }
   }
 
-  const sequence = detectMissingAndOrder(
-    pages.map(p => p.printed)
-  );
+  const sequence =
+    detectMissingAndOrder(
+      pages.map(
+        p => p.printed
+      )
+    );
 
   return {
     name: file.name,
     pageCount: pdf.numPages,
     pages,
-    period: extractStatementPeriod(joined),
-    mid: extractMid(joined),
-    merchant: extractMerchantName(joined),
+    period:
+      extractStatementPeriod(
+        joined
+      ),
+    mid:
+      extractMid(
+        joined
+      ),
+    merchant:
+      extractMerchantName(
+        joined
+      ),
     duplicates,
-    missing: sequence.missing,
-    outOfOrder: sequence.outOfOrder,
-    expectedTotal: sequence.expectedTotal
+    missing:
+      sequence.missing,
+    outOfOrder:
+      sequence.outOfOrder,
+    expectedTotal:
+      sequence.expectedTotal
   };
 }
 
 function summarize() {
   const allPages =
-    state.results.flatMap(r => r.pages);
+    state.results.flatMap(
+      r => r.pages
+    );
 
   const identity =
-    compareIdentity(state.results);
+    compareIdentity(
+      state.results
+    );
 
   const total =
     allPages.length;
@@ -260,6 +444,11 @@ function summarize() {
   const ocr =
     allPages.filter(
       p => p.ocrRequired
+    ).length;
+
+  const blankPages =
+    allPages.filter(
+      p => p.blankNonDataPage
     ).length;
 
   const rotated =
@@ -282,40 +471,83 @@ function summarize() {
 
   console.log(
     'OCR REQUIRED PAGES:',
-    state.results.flatMap(result =>
-      result.pages
-        .filter(
-          page => page.ocrRequired
-        )
-        .map(page => ({
-          file: result.name,
-          page: page.index,
-          ocrRequired: page.ocrRequired,
-          readable: page.readable
-        }))
+    state.results.flatMap(
+      result =>
+        result.pages
+          .filter(
+            page =>
+              page.ocrRequired
+          )
+          .map(
+            page => ({
+              file:
+                result.name,
+              page:
+                page.index,
+              ocrRequired:
+                page.ocrRequired,
+              blankNonDataPage:
+                page.blankNonDataPage,
+              meaningfulCharCount:
+                page.meaningfulCharCount,
+              imageCount:
+                page.imageCount,
+              readable:
+                page.readable
+            })
+          )
+    )
+  );
+
+  console.log(
+    'BLANK NON-DATA PAGES:',
+    state.results.flatMap(
+      result =>
+        result.pages
+          .filter(
+            page =>
+              page.blankNonDataPage
+          )
+          .map(
+            page => ({
+              file:
+                result.name,
+              page:
+                page.index,
+              meaningfulCharCount:
+                page.meaningfulCharCount,
+              imageCount:
+                page.imageCount
+            })
+          )
     )
   );
 
   const missing =
-    state.results.flatMap(r =>
-      r.missing.map(
-        p => `${r.name}: ${p}`
-      )
+    state.results.flatMap(
+      r =>
+        r.missing.map(
+          p =>
+            `${r.name}: ${p}`
+        )
     );
 
   const duplicates =
-    state.results.flatMap(r =>
-      r.duplicates.map(
-        ([a, b]) =>
-          `${r.name}: ${a}/${b}`
-      )
+    state.results.flatMap(
+      r =>
+        r.duplicates.map(
+          ([a, b]) =>
+            `${r.name}: ${a}/${b}`
+        )
     );
 
   const order =
-    state.results.flatMap(r =>
-      r.outOfOrder.map(
-        p => `${r.name}: ${p}`
-      )
+    state.results.flatMap(
+      r =>
+        r.outOfOrder.map(
+          p =>
+            `${r.name}: ${p}`
+        )
     );
 
   setText(
@@ -325,7 +557,7 @@ function summarize() {
 
   setText(
     'textLayerStatus',
-    `${total - ocr} of ${total} pages`
+    `${total - ocr - blankPages} text page(s) · ${blankPages} blank/non-data page(s)`
   );
 
   setText(
@@ -343,8 +575,7 @@ function summarize() {
         : 'Not detected'
       : 'Mismatch'
   );
-
-  setText(
+    setText(
     'merchantStatus',
     identity.midMatch &&
       identity.merchantMatch
@@ -459,7 +690,9 @@ function summarize() {
     'ocrStatus',
     ocr
       ? `${ocr} page(s) require OCR`
-      : 'Text layer available'
+      : blankPages
+        ? `Text layer available · ${blankPages} blank/non-data page(s)`
+        : 'Text layer available'
   );
 }
 
@@ -475,6 +708,16 @@ function renderValidation() {
 
     card.className =
       'file-card';
+
+    const ocrCount =
+      r.pages.filter(
+        p => p.ocrRequired
+      ).length;
+
+    const blankCount =
+      r.pages.filter(
+        p => p.blankNonDataPage
+      ).length;
 
     const issues =
       r.missing.length +
@@ -498,7 +741,8 @@ function renderValidation() {
         <strong></strong>
         <small>
           ${r.pageCount} page(s) ·
-          ${r.pages.filter(p => p.ocrRequired).length} OCR-required ·
+          ${ocrCount} OCR-required ·
+          ${blankCount} blank/non-data ·
           ${issues ? `${issues} issue(s)` : 'validated'}
           <br>Detected period: ${periodText}
           <br>Extracted date text: ${
@@ -517,17 +761,23 @@ function renderValidation() {
       <span aria-hidden="true">${issues ? '⚠' : '✓'}</span>
     `;
 
-    card.querySelector('strong').textContent =
+    card
+      .querySelector('strong')
+      .textContent =
       r.name;
 
-    el.validationFiles.append(card);
+    el.validationFiles.append(
+      card
+    );
   }
 
   summarize();
 }
 
 async function validate() {
-  el.continueButton.disabled = true;
+  el.continueButton.disabled =
+    true;
+
   el.continueButton.textContent =
     'Validating…';
 
@@ -539,14 +789,22 @@ async function validate() {
   try {
     state.results = [];
 
-    for (const file of state.files) {
+    for (
+      const file of
+      state.files
+    ) {
       state.results.push(
-        await inspectFile(file)
+        await inspectFile(
+          file
+        )
       );
     }
 
     renderValidation();
-    navigate('validation');
+
+    navigate(
+      'validation'
+    );
 
   } catch (error) {
     const notice =
@@ -557,10 +815,13 @@ async function validate() {
 
     notice.innerHTML =
       `<strong>PDF validation error</strong><p>${String(
-        error.message || error
+        error.message ||
+        error
       )}</p>`;
 
-    navigate('validation');
+    navigate(
+      'validation'
+    );
 
   } finally {
     el.continueButton.disabled =
@@ -598,7 +859,10 @@ el.pdfInput.addEventListener(
 el.clearQueue.onclick = () => {
   state.files = [];
   state.results = [];
+  state.extractions = [];
+
   el.pdfInput.value = '';
+
   renderQueue();
 };
 
@@ -608,31 +872,35 @@ el.continueButton.onclick =
 [
   'dragenter',
   'dragover'
-].forEach(n =>
-  el.dropZone.addEventListener(
-    n,
-    e => {
-      e.preventDefault();
-      el.dropZone.classList.add(
-        'dragover'
-      );
-    }
-  )
+].forEach(
+  n =>
+    el.dropZone.addEventListener(
+      n,
+      e => {
+        e.preventDefault();
+
+        el.dropZone.classList.add(
+          'dragover'
+        );
+      }
+    )
 );
 
 [
   'dragleave',
   'drop'
-].forEach(n =>
-  el.dropZone.addEventListener(
-    n,
-    e => {
-      e.preventDefault();
-      el.dropZone.classList.remove(
-        'dragover'
-      );
-    }
-  )
+].forEach(
+  n =>
+    el.dropZone.addEventListener(
+      n,
+      e => {
+        e.preventDefault();
+
+        el.dropZone.classList.remove(
+          'dragover'
+        );
+      }
+    )
 );
 
 el.dropZone.addEventListener(
@@ -643,7 +911,10 @@ el.dropZone.addEventListener(
     )
 );
 
-function displayField(label, item) {
+function displayField(
+  label,
+  item
+) {
   const value =
     item?.value ||
     'Not detected';
@@ -651,7 +922,8 @@ function displayField(label, item) {
   const confidence =
     item
       ? `${Math.round(
-          item.confidence * 100
+          item.confidence *
+          100
         )}%`
       : '—';
 
@@ -674,21 +946,158 @@ function displayField(label, item) {
   `;
 }
 
-function escapeHtml(value = '') {
-  return String(value).replace(
-    /[&<>"]/g,
-    c =>
-      ({
-        '&': '&amp;',
-        '<': '&lt;',
-        '>': '&gt;',
-        '"': '&quot;'
-      })[c]
-  );
+function escapeHtml(
+  value = ''
+) {
+  return String(value)
+    .replace(
+      /[&<>"]/g,
+      c =>
+        ({
+          '&': '&amp;',
+          '<': '&lt;',
+          '>': '&gt;',
+          '"': '&quot;'
+        })[c]
+    );
 }
 
-function metricRow(label, metric) {
-  if (!metric) return '';
+function metricEvidence(
+  metric
+) {
+  if (!metric) {
+    return '';
+  }
+
+  const evidence =
+    metric.evidence;
+
+  const assumptions =
+    Array.isArray(
+      metric.assumptions
+    )
+      ? metric.assumptions
+      : [];
+
+  if (
+    !evidence &&
+    !assumptions.length
+  ) {
+    return '';
+  }
+
+  const parts =
+    [];
+
+  if (evidence) {
+    if (
+      evidence.page !==
+      undefined
+    ) {
+      parts.push(
+        `Page: ${escapeHtml(
+          evidence.page
+        )}`
+      );
+    }
+
+    if (
+      evidence.line !==
+      undefined
+    ) {
+      parts.push(
+        `Line: ${escapeHtml(
+          evidence.line
+        )}`
+      );
+    }
+
+    if (
+      evidence.rawText
+    ) {
+      parts.push(
+        `Raw text: ${escapeHtml(
+          evidence.rawText
+        )}`
+      );
+    }
+
+    if (
+      evidence.sourceType
+    ) {
+      parts.push(
+        `Extraction method: ${escapeHtml(
+          evidence.sourceType
+        )}`
+      );
+    }
+
+    if (
+      evidence.label
+    ) {
+      parts.push(
+        `Matched label: ${escapeHtml(
+          evidence.label
+        )}`
+      );
+    }
+
+    if (
+      evidence.signedStatementValue !==
+      undefined
+    ) {
+      parts.push(
+        `Signed statement value: ${escapeHtml(
+          evidence.signedStatementValue
+        )}`
+      );
+    }
+  }
+
+  if (
+    metric.confidence !==
+    undefined
+  ) {
+    parts.push(
+      `Confidence: ${Math.round(
+        (
+          metric.confidence ||
+          0
+        ) *
+        100
+      )}%`
+    );
+  }
+
+  if (
+    assumptions.length
+  ) {
+    parts.push(
+      `Assumptions: ${escapeHtml(
+        assumptions.join(
+          ' | '
+        )
+      )}`
+    );
+  }
+
+  return `
+    <details>
+      <summary>Evidence</summary>
+      <div class="raw-evidence">
+        ${parts.join('<br>')}
+      </div>
+    </details>
+  `;
+}
+
+function metricRow(
+  label,
+  metric
+) {
+  if (!metric) {
+    return '';
+  }
 
   if (
     metric.status ===
@@ -699,32 +1108,53 @@ function metricRow(label, metric) {
         <span>${escapeHtml(label)}</span>
         <strong>Insufficient evidence</strong>
       </div>
+      ${metricEvidence(metric)}
     `;
   }
 
   const raw =
     metric.value;
 
-  const v =
-    typeof raw === 'number'
-      ? metric.formula ===
-        'total_fees / gross_volume'
-        ? `${(raw * 100).toFixed(3)}%`
-        : metric.type === 'integer'
-          ? raw.toLocaleString(
-              'en-US'
-            )
-          : raw.toLocaleString(
-              'en-US',
-              {
-                minimumFractionDigits: 2,
-                maximumFractionDigits: 2
-              }
-            )
-      : '—';
+  let v =
+    '—';
+
+  if (
+    typeof raw ===
+    'number'
+  ) {
+    if (
+      label ===
+      'Transaction Count'
+    ) {
+      v =
+        Math.round(
+          raw
+        ).toLocaleString(
+          'en-US'
+        );
+
+    } else if (
+      metric.formula ===
+      'total_fees / gross_volume'
+    ) {
+      v =
+        `${(raw * 100).toFixed(3)}%`;
+
+    } else {
+      v =
+        raw.toLocaleString(
+          'en-US',
+          {
+            minimumFractionDigits: 2,
+            maximumFractionDigits: 2
+          }
+        );
+    }
+  }
 
   const tag =
-    metric.status === 'derived'
+    metric.status ===
+    'derived'
       ? ' (derived)'
       : '';
 
@@ -733,16 +1163,17 @@ function metricRow(label, metric) {
       <span>${escapeHtml(label)}</span>
       <strong>${escapeHtml(v)}${tag}</strong>
     </div>
+    ${metricEvidence(metric)}
   `;
-}
-
-function renderIntelligenceDiagnostic(
+}function renderIntelligenceDiagnostic(
   diagnostic
 ) {
   const diag =
     $('intelligenceDiagnostic');
 
-  if (!diag) return;
+  if (!diag) {
+    return;
+  }
 
   const r =
     diagnostic.reconciliation;
@@ -752,7 +1183,8 @@ function renderIntelligenceDiagnostic(
 
   const statusColor =
     {
-      reconciled: 'ok',
+      reconciled:
+        'ok',
       partially_reconciled:
         'warning',
       not_reconciled:
@@ -771,60 +1203,140 @@ function renderIntelligenceDiagnostic(
           'error'
     ).length;
 
-  diag.innerHTML =
-    `<div class="queue-header"><h3>Sprint 5.0 — Internal Diagnostic</h3></div><div class="status-panel">` +
-    `<div class="status-row"><span>Schema version</span><strong>${escapeHtml(diagnostic.schemaVersion)}</strong></div>` +
-    `<div class="status-row"><span>Overall confidence</span><strong>${Math.round((diagnostic.overallConfidence || 0) * 100)}%</strong></div>` +
-    `<div class="status-row"><span>Warnings</span><strong>${warnCount ? `${warnCount} warning(s)` : 'None'}</strong></div>` +
-    `<div class="status-row"><span>Unknown fees queued</span><strong>${diagnostic.unknownFees.length}</strong></div></div>` +
-    `<div class="queue-header"><h3>Merchant Metrics</h3></div><div class="status-panel">` +
+  const statementBlock =
+    `<article class="result-card">` +
+
+    `<header>` +
+    `<div>` +
+    `<strong>${escapeHtml(diagnostic.sourceFile)}</strong>` +
+    `<small>Statement Intelligence Diagnostic</small>` +
+    `</div>` +
+    `<span class="confidence">${Math.round((diagnostic.overallConfidence || 0) * 100)}%</span>` +
+    `</header>` +
+
+    `<div class="status-panel">` +
+
+    `<div class="status-row">` +
+    `<span>Schema version</span>` +
+    `<strong>${escapeHtml(diagnostic.schemaVersion)}</strong>` +
+    `</div>` +
+
+    `<div class="status-row">` +
+    `<span>Overall confidence</span>` +
+    `<strong>${Math.round((diagnostic.overallConfidence || 0) * 100)}%</strong>` +
+    `</div>` +
+
+    `<div class="status-row">` +
+    `<span>Warnings</span>` +
+    `<strong>${warnCount ? `${warnCount} warning(s)` : 'None'}</strong>` +
+    `</div>` +
+
+    `<div class="status-row">` +
+    `<span>Unknown fees queued</span>` +
+    `<strong>${diagnostic.unknownFees.length}</strong>` +
+    `</div>` +
+
+    `</div>` +
+
+    `<div class="queue-header">` +
+    `<h3>Merchant Metrics</h3>` +
+    `</div>` +
+
+    `<div class="status-panel">` +
+
     metricRow(
       'Gross Volume',
       m.grossVolume
     ) +
+
     metricRow(
       'Transaction Count',
       m.transactionCount
     ) +
+
     metricRow(
       'Total Fees',
       m.totalFees
     ) +
+
     metricRow(
       'Effective Rate',
       m.effectiveRate
     ) +
+
     metricRow(
       'Average Ticket',
       m.averageTicket
     ) +
-    `</div><div class="queue-header"><h3>Reconciliation</h3></div>` +
-    `<div class="notice ${statusColor}"><strong>Status: ${escapeHtml(r.status.replaceAll('_', ' '))}</strong>` +
+
+    `</div>` +
+
+    `<div class="queue-header">` +
+    `<h3>Reconciliation</h3>` +
+    `</div>` +
+
+    `<div class="notice ${statusColor}">` +
+
+    `<strong>Status: ${escapeHtml(
+      r.status.replaceAll(
+        '_',
+        ' '
+      )
+    )}</strong>` +
+
     (
       r.feeStatementTotal !== null
         ? `<p>Extracted: $${r.feeExtracted.toFixed(2)} · Statement: $${r.feeStatementTotal.toFixed(2)} · Variance: $${r.feeVariance.toFixed(2)} · Tolerance: $${r.tolerance.toFixed(2)}</p>`
-        : '<p>Statement fee total not found in document; reconciliation cannot be assessed.</p>'
+        : `<p>Statement fee total not found in document; reconciliation cannot be assessed.</p>`
     ) +
+
     (
       r.proposalBlocked
         ? `<p><em>Savings and proposal generation blocked: ${escapeHtml(r.blockReason || 'reconciliation incomplete')}</em></p>`
         : ''
     ) +
+
     `</div>`;
+
+  let warningBlock =
+    '';
 
   if (
     diagnostic.warnings.length
   ) {
-    diag.insertAdjacentHTML(
-      'beforeend',
-      `<div class="queue-header"><h3>Warnings</h3></div><div class="status-panel">${
-        diagnostic.warnings.map(
+    warningBlock =
+      `<div class="queue-header">` +
+      `<h3>Warnings</h3>` +
+      `</div>` +
+
+      `<div class="status-panel">` +
+
+      diagnostic.warnings
+        .map(
           w =>
-            `<div class="status-row"><span>${escapeHtml(w.code.replaceAll('_', ' '))}</span><strong>${escapeHtml(w.message)}</strong></div>`
-        ).join('')
-      }</div>`
-    );
+            `<div class="status-row">` +
+            `<span>${escapeHtml(
+              w.code.replaceAll(
+                '_',
+                ' '
+              )
+            )}</span>` +
+            `<strong>${escapeHtml(
+              w.message
+            )}</strong>` +
+            `</div>`
+        )
+        .join('') +
+
+      `</div>`;
   }
+
+  diag.insertAdjacentHTML(
+    'beforeend',
+    statementBlock +
+      warningBlock +
+      `</article>`
+  );
 }
 
 function renderExtraction() {
@@ -840,34 +1352,53 @@ function renderExtraction() {
   const summary =
     $('extractionSummary');
 
-  metadata.innerHTML = '';
-  sections.innerHTML = '';
-  fees.innerHTML = '';
+  metadata.innerHTML =
+    '';
+
+  sections.innerHTML =
+    '';
+
+  fees.innerHTML =
+    '';
 
   const intelligenceDiag =
     $('intelligenceDiagnostic');
 
-  if (intelligenceDiag) {
-    intelligenceDiag.innerHTML = '';
+  if (
+    intelligenceDiag
+  ) {
+    intelligenceDiag.innerHTML =
+      '';
   }
 
   const totalSections =
     state.extractions.reduce(
-      (n, x) =>
-        n + x.sections.length,
+      (
+        n,
+        x
+      ) =>
+        n +
+        x.sections.length,
       0
     );
 
   const totalFees =
     state.extractions.reduce(
-      (n, x) =>
-        n + x.feeCandidates.length,
+      (
+        n,
+        x
+      ) =>
+        n +
+        x.feeCandidates.length,
       0
     );
 
   const classified =
     state.extractions.reduce(
-      (n, x) =>
+      (
+        n,
+        x
+      ) =>
         n +
         (
           x.feeSummary
@@ -879,11 +1410,44 @@ function renderExtraction() {
 
   const unknown =
     state.extractions.reduce(
-      (n, x) =>
+      (
+        n,
+        x
+      ) =>
         n +
         (
           x.feeSummary
             ?.unknown ||
+          0
+        ),
+      0
+    );
+
+  const totalOcrPages =
+    state.extractions.reduce(
+      (
+        n,
+        x
+      ) =>
+        n +
+        (
+          x.validation
+            ?.ocrPageCount ||
+          0
+        ),
+      0
+    );
+
+  const totalUnknownQueued =
+    state.extractions.reduce(
+      (
+        n,
+        x
+      ) =>
+        n +
+        (
+          x.unknownFees
+            ?.length ||
           0
         ),
       0
@@ -894,7 +1458,9 @@ function renderExtraction() {
     `<div class="status-row"><span>Sections detected</span><strong>${totalSections}</strong></div>` +
     `<div class="status-row"><span>Fees found</span><strong>${totalFees}</strong></div>` +
     `<div class="status-row"><span>Classified</span><strong>${classified}</strong></div>` +
-    `<div class="status-row"><span>Needs review</span><strong>${unknown}</strong></div>`;
+    `<div class="status-row"><span>Needs review</span><strong>${unknown}</strong></div>` +
+    `<div class="status-row"><span>OCR-required pages</span><strong>${totalOcrPages}</strong></div>` +
+    `<div class="status-row"><span>Unknown fees queued</span><strong>${totalUnknownQueued}</strong></div>`;
 
   for (
     const x of
@@ -904,21 +1470,91 @@ function renderExtraction() {
       x.metadata;
 
     const candidate =
-      x.processor.strongestCandidate;
+      x.processor
+        .strongestCandidate;
 
     const processorStatus =
-      x.processor.requiresReview
+      x.processor
+        .requiresReview
         ? 'Requires review'
         : 'Confirmed';
 
     const processorSummary =
-      x.processor.requiresReview
+      x.processor
+        .requiresReview
         ? `Processor: ${escapeHtml(x.processor.name)} · ${escapeHtml(processorStatus)}${candidate?.processor ? ` · Candidate: ${escapeHtml(candidate.processor)} (${Math.round((candidate.confidence || 0) * 100)}%)` : ''}`
         : `Processor: ${escapeHtml(x.processor.detectedName || x.processor.name)} · ${escapeHtml(processorStatus)}`;
 
     metadata.insertAdjacentHTML(
       'beforeend',
-      `<article class="result-card"><header><div><strong>${escapeHtml(x.sourceFile)}</strong><small>${processorSummary} · Rule pack: ${escapeHtml(x.processor.rulePack || 'Generic Processor')} (${escapeHtml(x.processor.rulePackVersion || 'n/a')})</small></div><span class="confidence">${Math.round(x.processor.confidence * 100)}%</span></header>${x.processor.fallbackReason ? `<small>${escapeHtml(x.processor.fallbackReason)}</small>` : ''}${x.processor.evidence.length ? `<details><summary>Processor evidence</summary><div class="raw-evidence">${x.processor.evidence.map(item => `${escapeHtml(item.processor)} (${Math.round(item.confidence * 100)}%): ${escapeHtml(item.evidence.map(e => e.match || e.alias || e.pattern).join(' | '))}`).join('<br>')}</div></details>` : ''}</article>${displayField('Merchant name', m.merchantName)}${displayField('Merchant ID', m.merchantId)}${displayField('Terminal ID', m.terminalId)}${displayField('Statement period', m.statementPeriod)}${displayField('Address', m.address)}`
+
+      `<article class="result-card">` +
+
+      `<header>` +
+      `<div>` +
+      `<strong>${escapeHtml(x.sourceFile)}</strong>` +
+      `<small>${processorSummary} · Rule pack: ${escapeHtml(x.processor.rulePack || 'Generic Processor')} (${escapeHtml(x.processor.rulePackVersion || 'n/a')})</small>` +
+      `</div>` +
+      `<span class="confidence">${Math.round(x.processor.confidence * 100)}%</span>` +
+      `</header>` +
+
+      (
+        x.processor.fallbackReason
+          ? `<small>${escapeHtml(x.processor.fallbackReason)}</small>`
+          : ''
+      ) +
+
+      (
+        x.processor.evidence.length
+          ? `<details>` +
+            `<summary>Processor evidence</summary>` +
+            `<div class="raw-evidence">` +
+            x.processor.evidence
+              .map(
+                item =>
+                  `${escapeHtml(item.processor)} (${Math.round(item.confidence * 100)}%): ${escapeHtml(
+                    item.evidence
+                      .map(
+                        e =>
+                          e.match ||
+                          e.alias ||
+                          e.pattern
+                      )
+                      .join(' | ')
+                  )}`
+              )
+              .join('<br>') +
+            `</div>` +
+            `</details>`
+          : ''
+      ) +
+
+      `</article>` +
+
+      displayField(
+        'Merchant name',
+        m.merchantName
+      ) +
+
+      displayField(
+        'Merchant ID',
+        m.merchantId
+      ) +
+
+      displayField(
+        'Terminal ID',
+        m.terminalId
+      ) +
+
+      displayField(
+        'Statement period',
+        m.statementPeriod
+      ) +
+
+      displayField(
+        'Address',
+        m.address
+      )
     );
 
     const chips =
@@ -926,14 +1562,49 @@ function renderExtraction() {
         x.sectionCounts
       )
         .map(
-          ([k, v]) =>
-            `<span class="section-chip">${escapeHtml(k.replaceAll('_', ' '))}: ${v}</span>`
+          (
+            [
+              k,
+              v
+            ]
+          ) =>
+            `<span class="section-chip">${escapeHtml(
+              k.replaceAll(
+                '_',
+                ' '
+              )
+            )}: ${v}</span>`
         )
         .join('');
 
     sections.insertAdjacentHTML(
       'beforeend',
-      `<article class="result-card"><strong>${escapeHtml(x.sourceFile)}</strong><small>${x.sections.length} section block(s) identified</small><div>${chips}</div><details><summary>View document map</summary><div class="raw-evidence">${x.sections.map(s => `Page ${s.page}, lines ${s.startLine}-${s.endLine}: ${escapeHtml(s.heading)} [${s.type}]`).join('<br>')}</div></details></article>`
+
+      `<article class="result-card">` +
+
+      `<strong>${escapeHtml(x.sourceFile)}</strong>` +
+
+      `<small>${x.sections.length} section block(s) identified</small>` +
+
+      `<div>${chips}</div>` +
+
+      `<details>` +
+      `<summary>View document map</summary>` +
+
+      `<div class="raw-evidence">` +
+
+      x.sections
+        .map(
+          s =>
+            `Page ${s.page}, lines ${s.startLine}-${s.endLine}: ${escapeHtml(s.heading)} [${s.type}]`
+        )
+        .join('<br>') +
+
+      `</div>` +
+
+      `</details>` +
+
+      `</article>`
     );
 
     if (
@@ -941,7 +1612,11 @@ function renderExtraction() {
     ) {
       fees.insertAdjacentHTML(
         'beforeend',
-        `<article class="result-card"><strong>${escapeHtml(x.sourceFile)}</strong><small>No fee candidates were extracted from detected fee sections. This is not a reconciliation result.</small></article>`
+
+        `<article class="result-card">` +
+        `<strong>${escapeHtml(x.sourceFile)}</strong>` +
+        `<small>No fee candidates were extracted from detected fee sections. This is not a reconciliation result.</small>` +
+        `</article>`
       );
     }
 
@@ -952,30 +1627,84 @@ function renderExtraction() {
         100
       )
     ) {
-      const classified =
+      const isClassified =
         f.status ===
         'classified';
 
       const title =
-        classified
+        isClassified
           ? `${escapeHtml(f.standardName)} <small>(${escapeHtml(f.canonicalId)})</small>`
           : `${escapeHtml(f.originalDescription)} <small>(Unknown fee)</small>`;
 
       const detail =
-        classified
+        isClassified
           ? `${escapeHtml(f.bucket.replaceAll('_', ' '))} · ${escapeHtml(f.category.replaceAll('_', ' '))} · Rule ${escapeHtml(f.ruleId)}`
           : `Needs review · Suggested broad bucket: ${escapeHtml((f.suggestedBucket || 'unknown').replaceAll('_', ' '))}`;
 
       fees.insertAdjacentHTML(
         'beforeend',
-        `<article class="result-card"><header><div><strong>${title}</strong><small>$${f.amount.toFixed(2)} · Page ${f.page}, line ${f.line} · ${detail}</small></div><span class="confidence">${Math.round((f.classificationConfidence || 0) * 100)}%</span></header><details><summary>Original statement evidence</summary><div class="raw-evidence">${escapeHtml(f.rawText)}</div></details></article>`
+
+        `<article class="result-card">` +
+
+        `<header>` +
+        `<div>` +
+        `<strong>${title}</strong>` +
+        `<small>$${f.amount.toFixed(2)} · Page ${f.page}, line ${f.line} · ${detail}</small>` +
+        `</div>` +
+        `<span class="confidence">${Math.round((f.classificationConfidence || 0) * 100)}%</span>` +
+        `</header>` +
+
+        `<details>` +
+        `<summary>Original statement evidence</summary>` +
+        `<div class="raw-evidence">${escapeHtml(f.rawText)}</div>` +
+        `</details>` +
+
+        `</article>`
       );
     }
+  }
 
-    if (x.metrics) {
-      renderIntelligenceDiagnostic(
-        x
-      );
+  if (
+    intelligenceDiag
+  ) {
+    intelligenceDiag.insertAdjacentHTML(
+      'beforeend',
+
+      `<div class="queue-header">` +
+      `<h3>Sprint 5.0 — Batch Diagnostic</h3>` +
+      `</div>` +
+
+      `<div class="status-panel">` +
+
+      `<div class="status-row">` +
+      `<span>Statements analyzed</span>` +
+      `<strong>${state.extractions.length}</strong>` +
+      `</div>` +
+
+      `<div class="status-row">` +
+      `<span>Total OCR-required pages</span>` +
+      `<strong>${totalOcrPages}</strong>` +
+      `</div>` +
+
+      `<div class="status-row">` +
+      `<span>Total unknown fees queued</span>` +
+      `<strong>${totalUnknownQueued}</strong>` +
+      `</div>` +
+
+      `</div>`
+    );
+
+    for (
+      const x of
+      state.extractions
+    ) {
+      if (
+        x.metrics
+      ) {
+        renderIntelligenceDiagnostic(
+          x
+        );
+      }
     }
   }
 
@@ -989,7 +1718,9 @@ function renderExtraction() {
     `<strong>Sprint 5.0 Statement Intelligence Pipeline active</strong><p>Pipeline orchestrates PDF validation, processor identification, structure discovery, fee classification, merchant metrics, and reconciliation readiness. Internal diagnostic summary shown above. Savings and proposal generation are blocked until reconciliation is confirmed.</p>`;
 }
 
-function firstMetricValue(metric) {
+function firstMetricValue(
+  metric
+) {
   return (
     metric &&
     typeof metric.value ===
@@ -1005,7 +1736,9 @@ function currentDiagnostic() {
     : null;
 }
 
-function profitNumber(id) {
+function profitNumber(
+  id
+) {
   const node =
     $(id);
 
@@ -1014,9 +1747,13 @@ function profitNumber(id) {
   }
 
   const value =
-    Number(node.value);
+    Number(
+      node.value
+    );
 
-  return Number.isFinite(value)
+  return Number.isFinite(
+    value
+  )
     ? value
     : 0;
 }
@@ -1038,24 +1775,27 @@ function updateProfitFieldVisibility() {
     .querySelectorAll(
       '[data-profit-program]'
     )
-    .forEach(node => {
-      const allowed =
-        (
-          node.dataset
-            .profitProgram ||
-          ''
-        ).split(' ');
+    .forEach(
+      node => {
+        const allowed =
+          (
+            node.dataset
+              .profitProgram ||
+            ''
+          ).split(' ');
 
-      node.hidden =
-        !allowed.includes(
-          program
-        );
-    });
+        node.hidden =
+          !allowed.includes(
+            program
+          );
+      }
+    );
 }
 
 function buildProfitScenario() {
   const PI =
-    window.ClearCostProfitIntelligence;
+    window
+      .ClearCostProfitIntelligence;
 
   if (!PI) {
     throw new Error(
@@ -1225,12 +1965,14 @@ function buildProfitScenario() {
       {
         name:
           'Verified program revenue',
+
         amount:
           V(
             revenue,
             revenueVerified,
             'Profit Intelligence input'
           ),
+
         category:
           'program_revenue'
       }
@@ -1240,12 +1982,14 @@ function buildProfitScenario() {
       {
         name:
           'Verified processor/internal costs',
+
         amount:
           V(
             cost,
             costVerified,
             'Profit Intelligence input'
           ),
+
         category:
           'processor_cost'
       }
@@ -1263,15 +2007,17 @@ function buildProfitScenario() {
         'minimumResidualProfit'
       )
   };
-}
-
-function moneyText(value) {
+}function moneyText(
+  value
+) {
   return (
     value === null ||
     value === undefined
   )
     ? 'Not verified'
-    : `$${Number(value).toLocaleString(
+    : `$${Number(
+        value
+      ).toLocaleString(
         'en-US',
         {
           minimumFractionDigits: 2,
@@ -1284,7 +2030,8 @@ function renderProfitResult(
   result
 ) {
   const PI =
-    window.ClearCostProfitIntelligence;
+    window
+      .ClearCostProfitIntelligence;
 
   const badge =
     PI.getProfitBadge(
@@ -1294,7 +2041,9 @@ function renderProfitResult(
   const resultNode =
     $('profitResult');
 
-  if (!resultNode) {
+  if (
+    !resultNode
+  ) {
     return;
   }
 
@@ -1307,21 +2056,65 @@ function renderProfitResult(
           'danger'
           ? 'error'
           : 'warning'
-    }"><strong>${escapeHtml(badge.label)}</strong><p>${result.readyToPresent ? 'Profit Protection passed. This scenario may proceed to proposal review.' : 'This scenario is blocked from Ready to Present.'}</p></div>` +
+    }">` +
+
+    `<strong>${escapeHtml(
+      badge.label
+    )}</strong>` +
+
+    `<p>${
+      result.readyToPresent
+        ? 'Profit Protection passed. This scenario may proceed to proposal review.'
+        : 'This scenario is blocked from Ready to Present.'
+    }</p>` +
+
+    `</div>` +
 
     `<div class="status-panel">` +
 
-    `<div class="status-row"><span>Projected merchant expense</span><strong>${moneyText(result.projectedMerchantExpense)}</strong></div>` +
+    `<div class="status-row">` +
+    `<span>Projected merchant expense</span>` +
+    `<strong>${moneyText(
+      result.projectedMerchantExpense
+    )}</strong>` +
+    `</div>` +
 
-    `<div class="status-row"><span>Projected monthly savings</span><strong>${moneyText(result.projectedMonthlySavings)}</strong></div>` +
+    `<div class="status-row">` +
+    `<span>Projected monthly savings</span>` +
+    `<strong>${moneyText(
+      result.projectedMonthlySavings
+    )}</strong>` +
+    `</div>` +
 
-    `<div class="status-row"><span>Projected annual savings</span><strong>${moneyText(result.projectedAnnualSavings)}</strong></div>` +
+    `<div class="status-row">` +
+    `<span>Projected annual savings</span>` +
+    `<strong>${moneyText(
+      result.projectedAnnualSavings
+    )}</strong>` +
+    `</div>` +
 
-    `<div class="status-row"><span>Internal gross profit pool</span><strong>${moneyText(result.grossProfitPool)}</strong></div>` +
+    `<div class="status-row">` +
+    `<span>Internal gross profit pool</span>` +
+    `<strong>${moneyText(
+      result.grossProfitPool
+    )}</strong>` +
+    `</div>` +
 
-    `<div class="status-row"><span>Projected monthly residual</span><strong>${moneyText(result.projectedMonthlyResidual)}</strong></div>` +
+    `<div class="status-row">` +
+    `<span>Projected monthly residual</span>` +
+    `<strong>${moneyText(
+      result.projectedMonthlyResidual
+    )}</strong>` +
+    `</div>` +
 
-    `<div class="status-row"><span>Ready to Present</span><strong>${result.readyToPresent ? 'Yes' : 'No'}</strong></div>` +
+    `<div class="status-row">` +
+    `<span>Ready to Present</span>` +
+    `<strong>${
+      result.readyToPresent
+        ? 'Yes'
+        : 'No'
+    }</strong>` +
+    `</div>` +
 
     `</div>` +
 
@@ -1329,7 +2122,14 @@ function renderProfitResult(
       result
         .missingVerifiedInputs
         .length
-        ? `<div class="notice warning"><strong>Missing verified inputs</strong><p>${escapeHtml(result.missingVerifiedInputs.join(', '))}</p></div>`
+        ? `<div class="notice warning">` +
+          `<strong>Missing verified inputs</strong>` +
+          `<p>${escapeHtml(
+            result.missingVerifiedInputs.join(
+              ', '
+            )
+          )}</p>` +
+          `</div>`
         : ''
     ) +
 
@@ -1337,17 +2137,36 @@ function renderProfitResult(
       result
         .warnings
         .length
-        ? `<div class="notice warning"><strong>Profit Protection</strong><p>${escapeHtml(result.warnings.join(' '))}</p></div>`
+        ? `<div class="notice warning">` +
+          `<strong>Profit Protection</strong>` +
+          `<p>${escapeHtml(
+            result.warnings.join(
+              ' '
+            )
+          )}</p>` +
+          `</div>`
         : ''
     ) +
 
-    `<details><summary>Internal calculation audit</summary><div class="raw-evidence">${result.audit.map(escapeHtml).join('<br>')}</div></details>`;
+    `<details>` +
+    `<summary>Internal calculation audit</summary>` +
+    `<div class="raw-evidence">${
+      result.audit
+        .map(
+          escapeHtml
+        )
+        .join(
+          '<br>'
+        )
+    }</div>` +
+    `</details>`;
 }
 
 function calculateProfitability() {
   try {
     state.profitScenario =
-      window.ClearCostProfitIntelligence
+      window
+        .ClearCostProfitIntelligence
         .calculateProfitScenario(
           buildProfitScenario()
         );
@@ -1356,13 +2175,25 @@ function calculateProfitability() {
       state.profitScenario
     );
 
-  } catch (error) {
+  } catch (
+    error
+  ) {
     const resultNode =
       $('profitResult');
 
-    if (resultNode) {
+    if (
+      resultNode
+    ) {
       resultNode.innerHTML =
-        `<div class="notice error"><strong>Profit Intelligence blocked</strong><p>${escapeHtml(String(error.message || error))}</p></div>`;
+        `<div class="notice error">` +
+        `<strong>Profit Intelligence blocked</strong>` +
+        `<p>${escapeHtml(
+          String(
+            error.message ||
+            error
+          )
+        )}</p>` +
+        `</div>`;
     }
   }
 }
@@ -1374,19 +2205,35 @@ function openProfitability() {
   const resultNode =
     $('profitResult');
 
-  if (!d) {
-    if (resultNode) {
+  if (
+    !d
+  ) {
+    if (
+      resultNode
+    ) {
       resultNode.innerHTML =
-        '<div class="notice warning"><strong>No statement analysis available</strong><p>Validate and extract a statement first.</p></div>';
+        `<div class="notice warning">` +
+        `<strong>No statement analysis available</strong>` +
+        `<p>Validate and extract a statement first.</p>` +
+        `</div>`;
     }
 
   } else if (
     d.reconciliation
       ?.proposalBlocked
   ) {
-    if (resultNode) {
+    if (
+      resultNode
+    ) {
       resultNode.innerHTML =
-        `<div class="notice error"><strong>Proposal analysis blocked</strong><p>${escapeHtml(d.reconciliation.blockReason || 'Statement reconciliation is incomplete.')}</p></div>`;
+        `<div class="notice error">` +
+        `<strong>Proposal analysis blocked</strong>` +
+        `<p>${escapeHtml(
+          d.reconciliation
+            .blockReason ||
+          'Statement reconciliation is incomplete.'
+        )}</p>` +
+        `</div>`;
     }
 
   } else {
@@ -1473,7 +2320,9 @@ async function runExtraction() {
       'extraction'
     );
 
-  } catch (error) {
+  } catch (
+    error
+  ) {
     const notice =
       $('extractionNotice');
 
@@ -1481,7 +2330,13 @@ async function runExtraction() {
       'notice error';
 
     notice.innerHTML =
-      `<strong>Statement extraction error</strong><p>${escapeHtml(String(error.message || error))}</p>`;
+      `<strong>Statement extraction error</strong>` +
+      `<p>${escapeHtml(
+        String(
+          error.message ||
+          error
+        )
+      )}</p>`;
 
     navigate(
       'extraction'
@@ -1537,4 +2392,7 @@ if (
 }
 
 renderQueue();
-navigate('home');
+
+navigate(
+  'home'
+);
