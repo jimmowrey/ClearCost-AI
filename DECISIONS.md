@@ -4,6 +4,47 @@ Architectural decision record for ClearCost AI. Newest entries first.
 
 ---
 
+## 2026-07-20 — Processor Intelligence Engine (explainable detection layer)
+
+**Status:** Accepted. Additive, standalone (not wired into the live pipeline this sprint).
+
+### Problem
+
+Processor detection returned a single winner and a flat evidence list. It was
+hard to explain *why* a processor won, to compare runner-up candidates, or to
+preserve evidence when a statement matched no processor. These are needed to
+make detection trustworthy and to triage unknown processors safely.
+
+### Decision
+
+Add a standalone Processor Intelligence Engine
+(`js/processor-intelligence-engine.js`) that **reuses `ProcessorDetector` as the
+authoritative scorer** and enriches the result: ranked candidates with matched
+and missing evidence, an explained selected result with runner-ups, structured
+`unknownProcessorEvidence` capture on fallback, and a `rulePackHealth` report
+via a reusable validator (`js/rule-pack-health.js`).
+
+### Reasoning
+
+- Reusing the detector keeps scoring/selection unchanged, so every existing
+  detector, rule pack, and reconciliation test is unaffected.
+- Rule Packs remain the single source of processor knowledge; the engine only
+  reads and explains them.
+- Standalone (not wired into the pipeline) keeps the change low-risk and within
+  scope; wiring can follow in a later sprint.
+
+### Consequences
+
+- The global confidence threshold (0.5) is unchanged; no match is forced.
+- Generic fallback, Commerce Control detection, and Commerce Control
+  reconciliation at exactly $909.75 are preserved.
+- Confidence normalization is documented and deterministic:
+  `confidence = round2(min(rawScore / normalizationBase, 1))`, ordering by
+  integer `rawScore` desc then `processorId` asc.
+- No fee extraction, reconciliation, metric, or proposal behavior changed.
+
+---
+
 ## 2026-07-20 — Commerce Control reconciliation eligible total
 
 **Status:** Accepted (tactical). Rule Pack migration deferred to a separate branch/PR.

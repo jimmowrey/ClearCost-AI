@@ -13,7 +13,7 @@ export const SECTION_TYPES = Object.freeze({
 });
 
 const sectionRules = [
-  [SECTION_TYPES.INTERCHANGE, /\b(qualification|card type detail|discount detail|interchange\/program)\b/i],
+  [SECTION_TYPES.INTERCHANGE, /\b(interchange|qualification|card type detail|discount detail|interchange\/program)\b/i],
   [SECTION_TYPES.ASSESSMENTS, /\b(assessment|network fee|card brand fee|dues and assessments)\b/i],
   [SECTION_TYPES.DEPOSITS, /\b(deposit summary|funding summary|batch summary|deposits?)\b/i],
   [SECTION_TYPES.CHARGEBACKS, /\b(chargebacks?|retrievals?|disputes?)\b/i],
@@ -125,6 +125,17 @@ export function extractFeeCandidates(sections=[],options={}){
 
   const feeKeywordPattern=
     /\b(?:fee|assessment|discount|interchange|dues|avs|acquirer|license|monthly|equipment|chargeback|retrieval|adjustment)\b/i;
+
+  /*
+   * Lines that carry an amount but are NOT fees: totals, subtotals, sales
+   * volumes, transaction counts, rates, balances, deposits, averages, etc.
+   * Used to keep such lines out of the keyword-less "unknown fee" capture.
+   */
+  const nonFeeLinePattern=
+    /\b(?:totals?|sub[\s-]?total|grand total|balance|amount due|amount submitted|net|gross|sales|volume|transactions?|trans|items?|count|number|qty|quantity|average|avg|ticket|rate|apr|bps|basis points|deposits?|funding|disbursement|beginning|ending|carried|previous|opening|closing|summary)\b/i;
+
+  const dateLikeLinePattern=
+    /\b(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:tember)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\b|\d{1,2}\/\d{1,2}(?:\/\d{2,4})?/i;
 
   const salesDiscountPattern=
     /\b(?:VISA|MASTERCARD|DISCOVER)?\s*(?:DEBIT\s+)?SALES\s+(?:DISC|DISCOUNT)\b/i;
@@ -674,6 +685,8 @@ candidates.push({
         continue;
       }
 
+      let unlabeledFeeLine=false;
+
       /*
        * Formula rows must be resolved above.
        * Never treat the calculation basis as the charged fee.
@@ -685,12 +698,32 @@ candidates.push({
       }
 
       /*
-       * Bare numeric lines are not trustworthy standalone fees.
+       * Keyword-less description-and-amount lines.
+       *
+       * These reach this point only inside a recognized NON-interchange fee
+       * section (interchange sections are excluded from this loop above, so
+       * interchange detail rows can never be double-counted here).
+       *
+       * Per Option B: preserve such a line as an unknown fee for review rather
+       * than discarding it — UNLESS it is a recognizable non-fee line (total,
+       * subtotal, sales volume, transaction count, rate, date, etc.). Sales
+       * discounts are still preserved even though they contain "sales".
        */
       if(
         !feeKeywordPattern.test(description)
       ){
-        continue;
+        const isNonFeeLine=
+          (
+            nonFeeLinePattern.test(description) ||
+            dateLikeLinePattern.test(description)
+          ) &&
+          !salesDiscountPattern.test(description);
+
+        if(isNonFeeLine){
+          continue;
+        }
+
+        unlabeledFeeLine=true;
       }
 
       const isSalesDiscount=
@@ -716,25 +749,31 @@ candidates.push({
           line,
 
         confidence:
-          description.length>2
-            ? .82
-            : .55,
+          unlabeledFeeLine
+            ? .40
+            : description.length>2
+              ? .82
+              : .55,
 
         status:
-          isSalesDiscount
+          (isSalesDiscount || unlabeledFeeLine)
             ? 'needs_review'
             : 'unclassified',
 
         extractionMethod:
-          'single_line_fee',
+          unlabeledFeeLine
+            ? 'single_line_fee_unlabeled'
+            : 'single_line_fee',
 
         requiresManualReview:
-          isSalesDiscount,
+          isSalesDiscount || unlabeledFeeLine,
 
         reviewReason:
           isSalesDiscount
             ? 'Sales Discount meaning not yet confirmed'
-            : null
+            : unlabeledFeeLine
+              ? 'Amount in a fee section without a recognized fee keyword; preserved for manual review'
+              : null
       });
     }
   }
