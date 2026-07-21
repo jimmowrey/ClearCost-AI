@@ -7,7 +7,7 @@ const loader=new NodeProcessorRuleLoader();
 const detector=new ProcessorDetector(loader);
 
 const installed=await loader.getInstalledPacks();
-assert.deepEqual(installed,['common','fiserv','generic','payroc','square','tsys','worldpay']);
+assert.deepEqual(installed,['commerce_control','common','fiserv','generic','payroc','square','tsys','worldpay']);
 
 const PACK_KEYS=['manifest','layout','sections','aliases','fees','behaviors'];
 for(const id of installed){
