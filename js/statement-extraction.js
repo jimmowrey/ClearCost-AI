@@ -13,7 +13,7 @@ export const SECTION_TYPES = Object.freeze({
 });
 
 const sectionRules = [
-  [SECTION_TYPES.INTERCHANGE, /\b(qualification|card type detail|discount detail|interchange\/program)\b/i],
+  [SECTION_TYPES.INTERCHANGE, /\b(interchange|qualification|card type detail|discount detail|interchange\/program)\b/i],
   [SECTION_TYPES.ASSESSMENTS, /\b(assessment|network fee|card brand fee|dues and assessments)\b/i],
   [SECTION_TYPES.DEPOSITS, /\b(deposit summary|funding summary|batch summary|deposits?)\b/i],
   [SECTION_TYPES.CHARGEBACKS, /\b(chargebacks?|retrievals?|disputes?)\b/i],
