@@ -285,10 +285,30 @@ const isTotalRow=/\bTOTAL\b/i.test(description);
         (chargeMatch[1]==='-' ? -1 : 1) *
         Number(chargeMatch[2].replace(/,/g,''));
 
-      console.log('COMMERCE CONTROL IC ROW:',{description,volume,printedCharge,feeAmount:-printedCharge,page:section.page});candidates.push({
-        if(printedCharge>0) console.log('COMMERCE CONTROL IC CREDIT:',{description,printedCharge,feeAmount:-printedCharge,page:section.page});
-       candidates.push({
-        originalDescription:description,
+     console.log(
+  'COMMERCE CONTROL IC ROW:',
+  {
+    description,
+    volume,
+    printedCharge,
+    feeAmount:-printedCharge,
+    page:section.page
+  }
+);
+
+if(printedCharge>0){
+  console.log(
+    'COMMERCE CONTROL IC CREDIT:',
+    {
+      description,
+      printedCharge,
+      feeAmount:-printedCharge,
+      page:section.page
+    }
+  );
+}
+
+candidates.push({
         amount:-printedCharge,
         page:section.page,
         line:section.startLine+index,
