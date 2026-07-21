@@ -13,7 +13,7 @@ export const SECTION_TYPES = Object.freeze({
 });
 
 const sectionRules = [
-  [SECTION_TYPES.INTERCHANGE, /\b(interchange|qualification|card type detail|discount detail)\b/i],
+  [SECTION_TYPES.INTERCHANGE, /\b(qualification|card type detail|discount detail|interchange\/program)\b/i],
   [SECTION_TYPES.ASSESSMENTS, /\b(assessment|network fee|card brand fee|dues and assessments)\b/i],
   [SECTION_TYPES.DEPOSITS, /\b(deposit summary|funding summary|batch summary|deposits?)\b/i],
   [SECTION_TYPES.CHARGEBACKS, /\b(chargebacks?|retrievals?|disputes?)\b/i],
@@ -103,7 +103,11 @@ export async function detectProcessor(text='',options={}){
   };
 }
 
-export function extractFeeCandidates(sections=[]){
+export function extractFeeCandidates(sections=[],options={}){
+  const processorId=options.processorId||null;
+  const rulePackId=options.rulePackId||null;
+    console.log('FEE EXTRACTION SECTIONS:', sections);
+    console.log('INTERCHANGE SECTIONS:', sections.filter(s => s.type === SECTION_TYPES.INTERCHANGE));
   const feeTypes=new Set([
     SECTION_TYPES.INTERCHANGE,
     SECTION_TYPES.ASSESSMENTS,
@@ -150,7 +154,16 @@ export function extractFeeCandidates(sections=[]){
    * per-transaction interchange when the PDF extraction did not
    * provide those values.
    */
-
+  const useCommerceControlInterchangeParser=
+  processorId==='commerce_control' ||
+  rulePackId==='commerce_control' ||
+  sections.some(section=>
+    section.type===SECTION_TYPES.INTERCHANGE &&
+    section.heading==='Interchange/Program' &&
+    section.lines.some(line=>clean(line)==='Product/Description') &&
+    section.lines.some(line=>clean(line)==='Sub Total')
+  );
+  if(!useCommerceControlInterchangeParser){
   for(const section of sections.filter(
     s=>s.type===SECTION_TYPES.INTERCHANGE
   )){
@@ -230,7 +243,96 @@ export function extractFeeCandidates(sections=[]){
       }
     }
   }
+}
 
+if(useCommerceControlInterchangeParser){
+  for(const section of sections.filter(
+    s=>s.type===SECTION_TYPES.INTERCHANGE
+  )){
+    const lines=section.lines.map(clean);
+
+    for(let index=0;index<=lines.length-8;index++){
+      const description=lines[index];
+      const volumeLine=lines[index+1];
+      const salesPercentLine=lines[index+2];
+      const transactionCountLine=lines[index+3];
+      const transactionPercentLine=lines[index+4];
+      const percentRateLine=lines[index+5];
+      const perTransactionRateLine=lines[index+6];
+      const chargeLine=lines[index+7];
+
+      const volumeMatch=volumeLine.match(/^\$([\d,]+\.\d{2})$/);
+      const chargeMatch=chargeLine.match(/^(-?)\$?([\d,]+\.\d{2})$/);
+const isTotalRow=/\bTOTAL\b/i.test(description);
+      const isDetailRow=
+        description &&
+        !isTotalRow &&
+        volumeMatch &&
+        /^\d+(?:\.\d+)?%$/.test(salesPercentLine) &&
+        /^\d+$/.test(transactionCountLine) &&
+        /^\d+(?:\.\d+)?%$/.test(transactionPercentLine) &&
+        /^\d*\.?\d+$/.test(percentRateLine) &&
+        /^\$?\d*\.?\d{3}$/.test(perTransactionRateLine) &&
+        chargeMatch;
+
+      if(!isDetailRow) continue;
+
+      const volume=Number(
+        volumeMatch[1].replace(/,/g,'')
+      );
+
+      const printedCharge=
+        (chargeMatch[1]==='-' ? -1 : 1) *
+        Number(chargeMatch[2].replace(/,/g,''));
+
+     console.log(
+  'COMMERCE CONTROL IC ROW:',
+  {
+    description,
+    volume,
+    printedCharge,
+    feeAmount:-printedCharge,
+    page:section.page
+  }
+);
+
+if(printedCharge>0){
+  console.log(
+    'COMMERCE CONTROL IC CREDIT:',
+    {
+      description,
+      printedCharge,
+      feeAmount:-printedCharge,
+      page:section.page
+    }
+  );
+}
+
+candidates.push({
+        amount:-printedCharge,
+        page:section.page,
+        line:section.startLine+index,
+        section:section.type,
+        rawText:lines.slice(index,index+8).join(' '),
+        confidence:.99,
+        status:'unclassified',
+        extractionMethod:'commerce_control_interchange_table_row',
+        interchangeDetails:{
+          description,
+          volume,
+          transactionCount:Number(transactionCountLine),
+          percentRate:Number(percentRateLine),
+          perTransactionRate:Number(
+            perTransactionRateLine.replace('$','')
+          ),
+          interchangeCharge:-printedCharge
+        }
+      });
+
+      index+=7;
+    }
+  }
+}
   /*
    * ============================================================
    * NON-INTERCHANGE FEE EXTRACTION
@@ -646,7 +748,11 @@ export async function buildStatementExtraction(record,options={}){
   const joined=pages.map(p=>p.text).join('\n');
   const logoText=record.logoText||pages.map(p=>p.logoText).filter(Boolean).join('\n');
   const processor=await detectProcessor(joined,{detector:options.detector,mid:metadata.merchantId?.value,lines:pages.flatMap(p=>String(p.text||'').split(/\r?\n/)),logoText});
-  const feeCandidates=extractFeeCandidates(sections);
+  const feeCandidates=extractFeeCandidates(sections,{
+  processor:processor.name,
+  processorId:processor.processorId,
+  rulePackId:processor.rulePackId
+});
   const fees=classifyFeeCandidates(feeCandidates,{processor:processor.name});
   const feeSummary=summarizeFees(fees);
   const counts=sections.reduce((acc,s)=>{acc[s.type]=(acc[s.type]||0)+1;return acc;},{});
