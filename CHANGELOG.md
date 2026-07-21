@@ -31,6 +31,12 @@ under `Unreleased` until a versioning scheme is adopted (see `docs/Roadmap.md`).
 - Restored the `cardVolume` statement metric, which a WIP debugging commit had
   dropped from `js/statement-metrics.js` while its regression test remained,
   causing `test_statement_metrics.mjs` to fail.
+- Keyword-less description-and-amount lines inside a recognized non-interchange
+  fee section are now preserved as `needs_review` (with page/line provenance)
+  instead of being discarded, so unknown fees stay visible. Totals, subtotals,
+  volumes, transaction counts, rates, and dates are still excluded, and
+  interchange detail rows (and Commerce Control's $909.75 reconciliation) are
+  unaffected.
 
 ### Notes
 - No application behavior changed in the engineering-foundation documentation
