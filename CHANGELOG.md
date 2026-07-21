@@ -28,6 +28,9 @@ under `Unreleased` until a versioning scheme is adopted (see `docs/Roadmap.md`).
 ### Fixed
 - Commerce Control statement double-counting that prevented reconciliation to
   the printed fee total. See `DECISIONS.md` (2026-07-20).
+- Restored the `cardVolume` statement metric, which a WIP debugging commit had
+  dropped from `js/statement-metrics.js` while its regression test remained,
+  causing `test_statement_metrics.mjs` to fail.
 
 ### Notes
 - No application behavior changed in the engineering-foundation documentation

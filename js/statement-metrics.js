@@ -561,6 +561,27 @@ const GROSS_SALES_PATTERNS = [
   }
 ];
 
+const CARD_VOLUME_PATTERNS = [
+  {
+    re:
+      /\bcard\s+volume\b/i,
+    confidence:
+      0.90
+  },
+  {
+    re:
+      /\bcredit\s+card\s+(?:sales?|volume)\b/i,
+    confidence:
+      0.88
+  },
+  {
+    re:
+      /\bcard\s+sales?\b/i,
+    confidence:
+      0.82
+  }
+];
+
 const REFUND_PATTERNS = [
   {
     re:
@@ -1450,6 +1471,17 @@ export function extractStatementMetrics(
         8
     });
 
+  const cardVolume =
+    findLabelValueMetric({
+      lines,
+      patterns:
+        CARD_VOLUME_PATTERNS,
+      type:
+        'amount',
+      maxForwardLines:
+        8
+    });
+
   const refunds =
     findLabelValueMetric({
       lines,
@@ -1552,6 +1584,7 @@ export function extractStatementMetrics(
   return {
     grossVolume,
     grossSales,
+    cardVolume,
     refunds,
     chargebacks,
     transactionCount,
