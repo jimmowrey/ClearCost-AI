@@ -35,6 +35,10 @@ Fee Classification → Merchant Metrics → Reconciliation → Proposal Engine
 - `js/fee-intelligence.js` — classification and fee summarisation.
 - `js/reconciliation-readiness.js` — reconciliation assessment.
 - `js/processor-detector.js`, `js/processor-rule-loader*.js` — rule packs.
+- `js/processor-intelligence-engine.js` — explainable candidate ranking,
+  selected-result explanation, and unknown-processor evidence capture
+  (additive, standalone; reuses the detector as the authoritative scorer).
+- `js/rule-pack-health.js` — reusable rule pack health validation.
 
 ## Data flow & provenance
 

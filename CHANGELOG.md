@@ -13,6 +13,13 @@ under `Unreleased` until a versioning scheme is adopted (see `docs/Roadmap.md`).
   this changelog, and a `docs/` reference set (placeholder structure).
 - Reconciliation-eligible fee total (`reconciliationEligibleTotal`) and
   supporting helpers for Commerce Control statements. See `DECISIONS.md`.
+- `commerce_control` processor rule pack: evidence-based detection for Commerce
+  Control / North State Power Sports statements (Sprint 5.3).
+- Processor Intelligence Engine (`js/processor-intelligence-engine.js`):
+  explainable ranked candidates, selected result with runner-ups, per-signal
+  evidence attribution with provenance, and structured unknown-processor
+  evidence capture (Sprint 5.4, additive/standalone).
+- Reusable rule pack health validator (`js/rule-pack-health.js`).
 
 ### Changed
 - Statement reconciliation compares the reconciliation-eligible total rather
