@@ -1,0 +1,5 @@
+{
+  "fingerprints": [
+    { "pattern": "commerce control.*(statement|merchant)", "flags": "i", "weight": 15 }
+  ]
+}

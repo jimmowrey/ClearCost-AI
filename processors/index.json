@@ -6,6 +6,7 @@
     "worldpay",
     "fiserv",
     "tsys",
-    "square"
+    "square",
+    "commerce_control"
   ]
 }

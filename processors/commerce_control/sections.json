@@ -1,0 +1,5 @@
+{
+  "headings": [
+    { "pattern": "interchange/program", "flags": "i", "type": "interchange_detail", "weight": 15 }
+  ]
+}

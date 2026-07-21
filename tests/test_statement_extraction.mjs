@@ -7,6 +7,19 @@ const detector=new ProcessorDetector(new NodeProcessorRuleLoader());
 
 assert.equal(classifySectionHeading('INTERCHANGE DETAIL'),SECTION_TYPES.INTERCHANGE);
 assert.equal(classifySectionHeading('Deposit Summary'),SECTION_TYPES.DEPOSITS);
+
+// Regression (fix/interchange-detail-regex): a generic "Interchange Detail"
+// heading must map to the interchange_detail section. A prior WIP change had
+// narrowed the INTERCHANGE heading rule to only 'interchange/program', dropping
+// the generic 'interchange' token and mis-typing these sections.
+assert.equal(classifySectionHeading('Interchange Detail'),SECTION_TYPES.INTERCHANGE);
+// Commerce Control's 'Interchange/Program' heading must remain classified too.
+assert.equal(classifySectionHeading('Interchange/Program'),SECTION_TYPES.INTERCHANGE);
+const interchangeSections=segmentPage('Interchange Detail\nVisa FANF 15.00\nMC NABU 8.50',3);
+assert.ok(
+  interchangeSections.some(s=>s.type===SECTION_TYPES.INTERCHANGE),
+  'segmentPage maps an "Interchange Detail" heading to an interchange_detail section'
+);
 const sections=segmentPage('Merchant Information\nMerchant Name: Country Butcher\nMerchant ID: 123456789\nProcessing Summary\nGross Sales 10,000.00\nOther Fees\nMonthly Account Fee 25.00',1);
 assert.ok(sections.some(s=>s.type===SECTION_TYPES.MERCHANT));
 assert.ok(sections.some(s=>s.type===SECTION_TYPES.SUMMARY));

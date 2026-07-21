@@ -1,0 +1,8 @@
+{
+  "id": "commerce_control",
+  "name": "Commerce Control",
+  "version": "1.0.0",
+  "description": "Commerce Control statement platform rule pack (e.g. North State Power Sports interchange/program statements).",
+  "confidenceThreshold": 0.5,
+  "normalizationBase": 60
+}

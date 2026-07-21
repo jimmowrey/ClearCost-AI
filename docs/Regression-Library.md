@@ -21,6 +21,8 @@ Tests are deterministic and require no network access.
 | Test file | Covers | Related decision |
 |-----------|--------|------------------|
 | `tests/test_commerce_control_reconciliation.mjs` | Commerce Control reconciliation-eligible total; $909.75 reconciliation | `DECISIONS.md` 2026-07-20 |
+| `tests/test_processor_intelligence_commerce_control.mjs` | Commerce Control rule pack detection; evidence-based, threshold not weakened | Sprint 5.3 |
+| `tests/test_processor_intelligence_engine.mjs` | Candidate ranking, evidence explainability, runner-ups, unknown-processor evidence, rule pack health, deterministic ordering | Sprint 5.4 |
 | `tests/test_reconciliation_readiness.mjs` | Reconciliation status, tolerance, integer cents | — |
 | `tests/test_fee_intelligence.mjs` | Fee classification & summarisation | — |
 | `tests/test_processor_rule_pack.mjs` | Rule pack loading & detection | — |
