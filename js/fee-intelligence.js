@@ -391,6 +391,43 @@ export function classifyFeeCandidates(
       )
   );
 }
+// ── Reconciliation-eligible fee accounting ──────────────────────────────────
+//
+// Some processor-specific extraction methods emit fee candidates that are
+// ALSO represented in the statement's summarised fee section. These detail
+// rows are preserved for analysis (they carry per-line interchange provenance)
+// but must NOT be counted a second time when reconciling the extracted fee
+// total against the statement's printed total.
+//
+// This exclusion is scoped narrowly to Commerce Control interchange detail
+// rows. It is intentionally NOT a global suppression of interchange detail —
+// interchange detail for every other processor stays fully eligible.
+export const RECONCILIATION_EXCLUDED_EXTRACTION_METHODS = Object.freeze([
+  'commerce_control_interchange_table_row'
+]);
+
+// A fee candidate is reconciliation-eligible unless its extraction method is
+// one of the known duplicate-detail methods above.
+export function isReconciliationEligible(fee) {
+  return !RECONCILIATION_EXCLUDED_EXTRACTION_METHODS.includes(
+    fee && fee.extractionMethod
+  );
+}
+
+// Sum, in integer cents, of every reconciliation-eligible fee candidate.
+// Integer-cent arithmetic avoids floating-point accumulation error.
+export function computeReconciliationEligibleCents(fees=[]) {
+  return fees.reduce((cents, fee) => {
+    if (!isReconciliationEligible(fee)) return cents;
+    return cents + Math.round(Number(fee.amount || 0) * 100);
+  }, 0);
+}
+
+// Reconciliation-eligible total in dollars, derived from the integer-cent sum.
+export function computeReconciliationEligibleTotal(fees=[]) {
+  return computeReconciliationEligibleCents(fees) / 100;
+}
+
 export function summarizeFees(fees=[]){
 
   const summary = {
@@ -401,6 +438,15 @@ export function summarizeFees(fees=[]){
       0,
 
     totalAmount:
+      0,
+
+    // Reconciliation-eligible total (excludes duplicate detail rows such as
+    // Commerce Control interchange table rows). All fee candidates remain
+    // preserved; only the reconciliation SUM differs from totalAmount.
+    reconciliationEligibleCents:
+      0,
+
+    reconciliationEligibleTotal:
       0,
 
     buckets: {
@@ -508,6 +554,12 @@ export function summarizeFees(fees=[]){
         )
       );
   }
+
+  summary.reconciliationEligibleCents =
+    computeReconciliationEligibleCents(fees);
+
+  summary.reconciliationEligibleTotal =
+    summary.reconciliationEligibleCents / 100;
 
   return summary;
 }

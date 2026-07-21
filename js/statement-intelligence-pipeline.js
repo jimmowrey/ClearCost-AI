@@ -526,9 +526,14 @@ export async function runStatementIntelligencePipeline(
 
   const reconciliation =
     assessReconciliation({
+      // Reconcile against the eligible total, which excludes duplicate detail
+      // rows (e.g. Commerce Control interchange table rows) that are already
+      // represented in the statement's summarised fee section. Using the full
+      // feeSummary.totalAmount here would double-count those rows. All fee
+      // candidates and feeSummary.totalAmount remain preserved for analysis.
       extractedFeeTotal:
         extraction.feeSummary
-          .totalAmount,
+          .reconciliationEligibleTotal,
 
       statementFeeTotal,
 
