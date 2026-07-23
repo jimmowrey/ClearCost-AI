@@ -65,6 +65,36 @@ assert.equal(profile.terms.length, 0);
     /already saved/,
     "the exact same document cannot be duplicated"
   );
+
+  const extracted = registry.saveExtraction(profile.id, {
+    terms: [{
+      id: "authorization",
+      label: "Authorization",
+      value: "$0.04/item",
+      verified: false,
+    }],
+  });
+  assert.equal(extracted.extractionStatus, "extracted");
+  assert.equal(extracted.termsVerified, false);
+  assert.throws(
+    () => registry.verifyTerms(profile.id, extracted.terms, new Date(), true),
+    /verify every extracted term/i
+  );
+  assert.throws(
+    () => registry.verifyTerms(
+      profile.id,
+      extracted.terms.map(term => ({ ...term, verified: true }))
+    ),
+    /every Schedule A row/i
+  );
+  const verified = registry.verifyTerms(
+    profile.id,
+    extracted.terms.map(term => ({ ...term, verified: true })),
+    new Date("2026-07-23T13:00:00Z"),
+    true
+  );
+  assert.equal(verified.termsVerified, true);
+  assert.equal(verified.verifiedAt, "2026-07-23T13:00:00.000Z");
 }
 
 assert.throws(
