@@ -74,6 +74,11 @@ const fixture = JSON.parse(
   // still reproduces): all four category labels, the grand total printed in the
   // overview/summary boxes (multiple times), and the three component totals.
   const allText = fixture.pages.map(p => p.full_text).join('\n');
+  assert.doesNotMatch(
+    allText,
+    /GROSS REPORTABLE SALES-TIN[^\n]*\d/,
+    'fixture redacts the complete TIN, including its last four digits'
+  );
   for (const label of ['Interchange charges', 'Service charges', 'Fees', 'Program Fees']) {
     assert.ok(allText.includes(label), `fixture retains the "${label}" category label`);
   }
