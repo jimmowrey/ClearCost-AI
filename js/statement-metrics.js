@@ -1053,6 +1053,130 @@ function findGenericTransactionCount(
     }
 
     /*
+     * Prefer an exact reconciled Total row when the PDF text preserves the
+     * summary table's column order:
+     *
+     *   Total
+     *   [gross items] [gross amount]
+     *   [refund items] [refund amount]
+     *   [submitted items] [submitted amount]
+     *
+     * Both the item counts and the signed amounts must reconcile. Requiring
+     * both relationships prevents unrelated standalone integers elsewhere on
+     * the page from being mistaken for the submitted transaction count.
+     */
+
+    for (
+      let index = 0;
+      index <=
+      pageLines.length -
+      7;
+      index++
+    ) {
+      if (
+        !/^total$/i.test(
+          clean(
+            pageLines[index].text
+          )
+        )
+      ) {
+        continue;
+      }
+
+      const grossCount =
+        tryInteger(
+          pageLines[index + 1].text
+        );
+
+      const grossAmount =
+        tryAmount(
+          pageLines[index + 2].text
+        );
+
+      const refundCount =
+        tryInteger(
+          pageLines[index + 3].text
+        );
+
+      const refundAmount =
+        tryAmount(
+          pageLines[index + 4].text
+        );
+
+      const submittedCount =
+        tryInteger(
+          pageLines[index + 5].text
+        );
+
+      const submittedAmount =
+        tryAmount(
+          pageLines[index + 6].text
+        );
+
+      if (
+        grossCount === null ||
+        grossAmount === null ||
+        refundCount === null ||
+        refundAmount === null ||
+        submittedCount === null ||
+        submittedAmount === null
+      ) {
+        continue;
+      }
+
+      const grossCents =
+        Math.round(
+          grossAmount * 100
+        );
+
+      const refundCents =
+        Math.round(
+          refundAmount * 100
+        );
+
+      const submittedCents =
+        Math.round(
+          submittedAmount * 100
+        );
+
+      if (
+        grossCount +
+          refundCount !==
+          submittedCount ||
+        grossCents +
+          refundCents !==
+          submittedCents
+      ) {
+        continue;
+      }
+
+      return makeFoundMetric({
+        value:
+          submittedCount,
+
+        rawText:
+          `Gross count ${grossCount} + refund count ${refundCount} = submitted count ${submittedCount}; gross ${grossCents} cents + refunds ${refundCents} cents = submitted ${submittedCents} cents`,
+
+        page:
+          pageNumber,
+
+        line:
+          pageLines[
+            index + 5
+          ].line,
+
+        confidence:
+          0.99,
+
+        sourceType:
+          'reconciled_summary_total_row',
+
+        label:
+          'Reconciled summary Total row'
+      });
+    }
+
+    /*
      * Collect standalone whole-number values only.
      */
 

@@ -116,6 +116,19 @@ const result = await runStatementIntelligencePipeline(
   assert.equal(result.metrics.totalFees.value, 1501.57);
 }
 
+// ── 2a. Submitted transaction count and average ticket use the net column ─────
+{
+  assert.equal(result.metrics.grossVolume.value, 82756.12);
+  assert.equal(result.metrics.transactionCount.status, 'found');
+  assert.equal(result.metrics.transactionCount.value, 319);
+  assert.equal(
+    result.metrics.transactionCount.formula,
+    'reconciled_summary_total_row'
+  );
+  assert.equal(result.metrics.averageTicket.status, 'derived');
+  assert.equal(result.metrics.averageTicket.value, 259.42);
+}
+
 // ── 3. Every extracted fee is a Commerce Control fee row (no leaked garbage) ─
 {
   const rows = result.feeCandidates;
