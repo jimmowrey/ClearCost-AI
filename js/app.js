@@ -1808,7 +1808,7 @@ function applyAgentSettingsToProfit() {
 
   if ($('agentSplit')) {
     $('agentSplit').value =
-      agentSettings.agentSplitPercent;
+      agentSettings.agentSplitPercent ?? '';
   }
 
   if ($('verifyAgentSplit')) {
@@ -1828,7 +1828,7 @@ function applyAgentSettingsToForm() {
     settingsPhone: agentSettings.phone,
     settingsEmail: agentSettings.email,
     settingsIsoProcessor: agentSettings.isoProcessorName,
-    settingsAgentSplit: agentSettings.agentSplitPercent,
+    settingsAgentSplit: agentSettings.agentSplitPercent ?? '',
     settingsMinimumResidual: agentSettings.minimumMonthlyResidual
   };
 
@@ -1866,8 +1866,8 @@ function saveAgentSettings() {
       status.innerHTML =
         `<div class="notice ok">` +
         `<strong>Agent settings saved</strong>` +
-        `<p>${escapeHtml(agentSettings.isoProcessorName)} · ` +
-        `${agentSettings.agentSplitPercent}% agent split</p>` +
+        `<p>${escapeHtml(agentSettings.isoProcessorName || 'ISO not set')} · ` +
+        `${agentSettings.agentSplitPercent ?? 'Split not set'}${agentSettings.agentSplitPercent === null ? '' : '% agent split'}</p>` +
         `</div>`;
     }
   } catch (error) {
@@ -2088,7 +2088,9 @@ function buildProfitScenario() {
       V(
         split,
         splitVerified,
-        `Agent Settings: ${agentSettings.isoProcessorName}`
+        agentSettings.isoProcessorName
+          ? `Agent Settings: ${agentSettings.isoProcessorName}`
+          : 'Agent Settings'
       ),
 
     minimumMonthlyResidual:
