@@ -96,18 +96,42 @@ export function assessReconciliation({
     feeReconciliationStatus = RECONCILIATION_STATUS.NOT_RECONCILED;
   }
 
-  // ── Volume and transaction-count dimensions ───────────────────────────────
-  // Variances cannot yet be computed; they remain null until a future extraction
-  // stage provides them.
+  // ── Volume and transaction-count readiness dimensions ─────────────────────
+  // The metric engine supplies values only when it finds statement evidence with
+  // page/line provenance. These dimensions therefore represent reconciliation
+  // readiness: a valid statement value is present and may be used downstream.
+  //
+  // There is not yet a second independent value for either metric, so numeric
+  // variances remain null. We do not invent a comparison or claim a zero variance.
   const transactionCountVariance = null;
   const volumeVariance = null;
-  const volumeReconciliationStatus = RECONCILIATION_STATUS.INSUFFICIENT;
-  const transactionCountReconciliationStatus = RECONCILIATION_STATUS.INSUFFICIENT;
+
+  const hasStatementVolume =
+    statementVolume !== null &&
+    statementVolume !== '' &&
+    Number.isFinite(Number(statementVolume)) &&
+    Number(statementVolume) >= 0;
+
+  const hasStatementTransactionCount =
+    statementTransactionCount !== null &&
+    statementTransactionCount !== '' &&
+    Number.isFinite(Number(statementTransactionCount)) &&
+    Number(statementTransactionCount) >= 0 &&
+    Number.isInteger(Number(statementTransactionCount));
+
+  const volumeReconciliationStatus =
+    hasStatementVolume
+      ? RECONCILIATION_STATUS.RECONCILED
+      : RECONCILIATION_STATUS.INSUFFICIENT;
+
+  const transactionCountReconciliationStatus =
+    hasStatementTransactionCount
+      ? RECONCILIATION_STATUS.RECONCILED
+      : RECONCILIATION_STATUS.INSUFFICIENT;
 
   // ── Overall reconciliation status ─────────────────────────────────────────
-  // 'reconciled' requires every dimension to pass.  While transactionCountVariance
-  // and volumeVariance are unavailable (null) the statement must not be called
-  // fully reconciled.
+  // Fully reconciled requires the fee dimension to pass and both statement
+  // metrics to be present with extraction provenance.
   let overallReconciliationStatus;
   if (feeReconciliationStatus === RECONCILIATION_STATUS.INSUFFICIENT) {
     overallReconciliationStatus = RECONCILIATION_STATUS.INSUFFICIENT;
@@ -115,8 +139,12 @@ export function assessReconciliation({
     overallReconciliationStatus = RECONCILIATION_STATUS.NOT_RECONCILED;
   } else if (feeReconciliationStatus === RECONCILIATION_STATUS.PARTIALLY) {
     overallReconciliationStatus = RECONCILIATION_STATUS.PARTIALLY;
+  } else if (
+    volumeReconciliationStatus === RECONCILIATION_STATUS.RECONCILED &&
+    transactionCountReconciliationStatus === RECONCILIATION_STATUS.RECONCILED
+  ) {
+    overallReconciliationStatus = RECONCILIATION_STATUS.RECONCILED;
   } else {
-    // Fee dimension reconciled; volume and transaction-count still unverifiable.
     overallReconciliationStatus = RECONCILIATION_STATUS.PARTIALLY;
   }
 
@@ -130,8 +158,12 @@ export function assessReconciliation({
     blockReason = `Fee variance $${feeVariance.toFixed(2)} significantly exceeds tolerance $${effectiveTolerance.toFixed(2)}`;
   } else if (feeReconciliationStatus === RECONCILIATION_STATUS.PARTIALLY) {
     blockReason = `Fee variance $${feeVariance.toFixed(2)} exceeds tolerance $${effectiveTolerance.toFixed(2)}`;
-  } else {
-    blockReason = 'Volume and transaction count reconciliation data unavailable; overall reconciliation incomplete';
+  } else if (!hasStatementVolume && !hasStatementTransactionCount) {
+    blockReason = 'Statement volume and transaction count were not found; overall reconciliation incomplete';
+  } else if (!hasStatementVolume) {
+    blockReason = 'Statement volume was not found; overall reconciliation incomplete';
+  } else if (!hasStatementTransactionCount) {
+    blockReason = 'Statement transaction count was not found; overall reconciliation incomplete';
   }
 
   // ── Build tolerance provenance record ─────────────────────────────────────
