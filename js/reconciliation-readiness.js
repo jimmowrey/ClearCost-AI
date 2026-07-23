@@ -107,10 +107,14 @@ export function assessReconciliation({
   const volumeVariance = null;
 
   const hasStatementVolume =
+    statementVolume !== null &&
+    statementVolume !== '' &&
     Number.isFinite(Number(statementVolume)) &&
     Number(statementVolume) >= 0;
 
   const hasStatementTransactionCount =
+    statementTransactionCount !== null &&
+    statementTransactionCount !== '' &&
     Number.isFinite(Number(statementTransactionCount)) &&
     Number(statementTransactionCount) >= 0 &&
     Number.isInteger(Number(statementTransactionCount));
