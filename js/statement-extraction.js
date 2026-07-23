@@ -301,6 +301,7 @@ if(useCommerceControlInterchangeParser){
   // description head (rates, volumes, counts, percentages, connector words).
   const continuationValuePattern=/^(?:\$?-?[\d,]+\.?\d*%?|\.\d+)$/;
   const formulaConnectorPattern=/^(?:times|at|disc(?:ount)?(?:\s+rate)?|kilobytes?|per|trns|transactions?|\d+\s+(?:transactions?|trns)\s+at)$/i;
+  const formulaValueLinePattern=/^\$?-?[\d,]+(?:\.\d+)?\s+(?:at|times)\s+\$?-?\.?\d+$/i;
 
   // A "description" that is really a summary / overview label is not a fee.
   const summaryHeadPattern=/\b(?:adjustments?|chargebacks?|reversals?|retrievals?|disputes?|totals?|sub[\s-]?total|amount\s+(?:submitted|processed)|deposits?|fundings?|summary|overview)\b/i;
@@ -313,6 +314,7 @@ if(useCommerceControlInterchangeParser){
       continuationValuePattern.test(compact) ||
       signedAmountPattern.test(compact) ||
       formulaConnectorPattern.test(trimmed) ||
+      formulaValueLinePattern.test(trimmed) ||
       !/[A-Za-z]/.test(trimmed)
     );
   };
