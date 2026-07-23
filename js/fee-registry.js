@@ -414,6 +414,21 @@ const FEE_REGISTRY = Object.freeze([
   patterns:[/\bvisa network fee cp 1b-01\b/i],
   ruleId:'CC-FT-1007'
 },
+{
+  id:'CCF-CC-1008',
+  processorScope:'Commerce Control',
+  standardName:'STAR Token Exchange Debit Fee',
+  category:'assessment',
+  subcategory:'debit_network_token_exchange_fee',
+  bucket:'network',
+  brand:'STAR',
+  aliases:['star token exchange debit fee'],
+  frequency:'per_transaction',
+  negotiable:false,
+  published:true,
+  patterns:[/\bstar token exchange debit fee\b/i],
+  ruleId:'CC-FT-1008'
+},
 ]);
 
 export function getFeeRegistry(){return FEE_REGISTRY.map(item=>({...item,aliases:[...item.aliases],patterns:[...item.patterns]}));}
