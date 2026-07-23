@@ -63,8 +63,9 @@
 <label><input id="verifyRevenue" type="checkbox"> Revenue input verified</label>
 <label>Verified processor / internal costs ($)<input id="verifiedInternalCost" type="number" value="0" step="0.01"></label>
 <label><input id="verifyInternalCost" type="checkbox"> Cost input verified</label>
-<label>Agent split (%)<input id="agentSplit" type="number" value="80" min="0" max="100" step="1"></label>
-<label><input id="verifyAgentSplit" type="checkbox"> Agent split verified</label>
+<label>ISO / processor<input id="profitIsoProcessor" type="text" readonly></label>
+<label>Agent split (%)<input id="agentSplit" type="number" value="80" min="0" max="100" step="1" readonly></label>
+<label><input id="verifyAgentSplit" type="checkbox" disabled> Agent split verified in Settings</label>
 <label>Minimum monthly residual ($)<input id="minimumResidualProfit" type="number" value="500" min="0" step="25"></label>
 </div>
 <div class="notice"><strong>Profit Protection</strong><p>Ready to Present remains blocked until required internal economics are verified and the scenario meets the minimum residual requirement.</p></div>
@@ -73,7 +74,7 @@
 <button class="secondary full-width" type="button" data-screen="extraction">Back to Statement Extraction</button>
 </section>
 <section id="history" class="screen"><div class="section-intro"><h2>History</h2><p>Saved analyses will appear here after statement storage is connected.</p></div><div class="empty-state">No saved analyses yet.</div></section>
-<section id="settings" class="screen"><div class="section-intro"><h2>Settings</h2><p>Consultant details and profitability settings will be stored here.</p></div><div class="settings-card"><label>Consultant name<input type="text" value="Jim Mowrey"></label><label>Phone<input type="tel" value="530-720-6690"></label><label>Email<input type="email" value="jimmowrey@comcast.net"></label><label>Minimum monthly residual<input type="number" value="500" min="0" step="25"></label></div><div class="notice"><strong>Merchant data separation</strong><p>Consultant settings remain separate from merchant-facing reports.</p></div></section>
+<section id="settings" class="screen"><div class="section-intro"><h2>Agent Settings</h2><p>Your business identity and internal profitability defaults.</p></div><div class="settings-card"><label>Consultant name<input id="settingsConsultantName" type="text" autocomplete="name"></label><label>Phone<input id="settingsPhone" type="tel" autocomplete="tel"></label><label>Email<input id="settingsEmail" type="email" autocomplete="email"></label><label>ISO / processor name<input id="settingsIsoProcessor" type="text" value="SignaPay"></label><label>Agent residual split (%)<input id="settingsAgentSplit" type="number" value="80" min="0" max="100" step="0.01"></label><label><input id="settingsAgentSplitVerified" type="checkbox" checked> Residual split verified</label><label>Minimum monthly residual ($)<input id="settingsMinimumResidual" type="number" value="500" min="0" step="25"></label></div><button id="saveAgentSettings" class="primary full-width" type="button">Save Agent Settings</button><div id="agentSettingsStatus"></div><div class="notice"><strong>Merchant data separation</strong><p>Agent settings are stored separately from statement data and are never included in merchant-facing reports.</p></div></section>
 </main>
 <nav class="bottom-nav" aria-label="Primary navigation"><button type="button" data-screen="home" class="active">Home</button><button type="button" data-screen="new-analysis">New</button><button type="button" data-screen="history">History</button><button type="button" data-screen="settings">Settings</button></nav>
 </div>
