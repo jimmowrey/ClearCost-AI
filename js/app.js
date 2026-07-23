@@ -30,6 +30,14 @@ const agentSettingsStore =
 let agentSettings =
   agentSettingsStore.load();
 
+const scheduleARegistry =
+  window.ClearCostScheduleAProfiles
+    .createRegistry(window.localStorage);
+
+const scheduleADocumentStore =
+  window.ClearCostScheduleAProfiles
+    .createDocumentStore(window.indexedDB);
+
 const titles = {
   home: 'Home',
   'new-analysis': 'New Analysis',
@@ -1881,6 +1889,67 @@ function saveAgentSettings() {
   }
 }
 
+function renderScheduleAProfiles() {
+  const list = $('scheduleAList');
+  if (!list) return;
+  const profiles = scheduleARegistry.load();
+  list.innerHTML = profiles.length
+    ? profiles.map(profile =>
+        `<article class="result-card">` +
+        `<strong>${escapeHtml(profile.isoProcessorName)}</strong>` +
+        `<p>Effective ${escapeHtml(profile.effectiveDate)} · ` +
+        `${escapeHtml(profile.fileName)}</p>` +
+        `<small>Extraction pending · Terms not verified</small>` +
+        `</article>`
+      ).join('')
+    : '<div class="empty-state">No Schedule A versions uploaded.</div>';
+}
+
+async function sha256Hex(file) {
+  const bytes = await file.arrayBuffer();
+  const digest = await crypto.subtle.digest('SHA-256', bytes);
+  return Array.from(new Uint8Array(digest))
+    .map(value => value.toString(16).padStart(2, '0'))
+    .join('');
+}
+
+async function uploadScheduleA() {
+  const status = $('scheduleAStatus');
+  try {
+    const file = $('scheduleAPdf')?.files?.[0];
+    if (!file || (!file.name.toLowerCase().endsWith('.pdf') &&
+      file.type !== 'application/pdf')) {
+      throw new Error('Select a Schedule A PDF.');
+    }
+    const fingerprint = await sha256Hex(file);
+    const profile = window.ClearCostScheduleAProfiles.createProfile({
+      isoProcessorName: agentSettings.isoProcessorName,
+      effectiveDate: $('scheduleAEffectiveDate')?.value,
+      fileName: file.name,
+      fileSize: file.size,
+      documentFingerprint: fingerprint
+    });
+
+    await scheduleADocumentStore.put(profile.documentStorageKey, file);
+    scheduleARegistry.add(profile);
+    renderScheduleAProfiles();
+    $('scheduleAPdf').value = '';
+
+    if (status) {
+      status.innerHTML =
+        `<div class="notice ok"><strong>Schedule A version saved</strong>` +
+        `<p>${escapeHtml(profile.isoProcessorName)} · Effective ` +
+        `${escapeHtml(profile.effectiveDate)} · Extraction pending</p></div>`;
+    }
+  } catch (error) {
+    if (status) {
+      status.innerHTML =
+        `<div class="notice error"><strong>Schedule A not saved</strong>` +
+        `<p>${escapeHtml(String(error.message || error))}</p></div>`;
+    }
+  }
+}
+
 function buildProfitScenario() {
   const PI =
     window
@@ -2491,7 +2560,16 @@ if (saveAgentSettingsButton) {
     saveAgentSettings;
 }
 
+const uploadScheduleAButton =
+  $('uploadScheduleA');
+
+if (uploadScheduleAButton) {
+  uploadScheduleAButton.onclick =
+    uploadScheduleA;
+}
+
 applyAgentSettingsToForm();
+renderScheduleAProfiles();
 
 renderQueue();
 
