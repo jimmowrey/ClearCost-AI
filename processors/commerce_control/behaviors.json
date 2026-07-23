@@ -1,6 +1,7 @@
 {
   "detectionPatterns": [
     { "type": "wording", "pattern": "\\bcommerce control\\b",   "flags": "i", "weight": 35 },
+    { "type": "wording", "pattern": "\\bwww\\.commercecontrol\\.com\\b", "flags": "i", "weight": 55 },
     { "type": "wording", "pattern": "\\binterchange/program\\b", "flags": "i", "weight": 20 },
     { "type": "wording", "pattern": "\\bproduct/description\\b",  "flags": "i", "weight": 10 }
   ],

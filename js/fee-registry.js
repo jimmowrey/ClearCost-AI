@@ -429,6 +429,36 @@ const FEE_REGISTRY = Object.freeze([
   patterns:[/\bstar token exchange debit fee\b/i],
   ruleId:'CC-FT-1008'
 },
+{
+  id:'CCF-CC-1009',
+  processorScope:'Commerce Control',
+  standardName:'Visa Digital Commerce Service Fee',
+  category:'assessment',
+  subcategory:'network_digital_commerce_fee',
+  bucket:'network',
+  brand:'Visa',
+  aliases:['vi digital commerce svc fee mn','vi digital commerce svcs fee','jan vi digital commerce fe min','jan vi digital commerce svcs f'],
+  frequency:'monthly_or_volume_based',
+  negotiable:false,
+  published:true,
+  patterns:[/\b(?:jan-)?vi digital commerce (?:svc fee mn|svcs fee|fe min|svcs f)\b/i],
+  ruleId:'CC-FT-1009'
+},
+{
+  id:'CCF-CC-1010',
+  processorScope:'Commerce Control',
+  standardName:'Visa International Acquirer Fee',
+  category:'assessment',
+  subcategory:'international_acquirer_fee',
+  bucket:'network',
+  brand:'Visa',
+  aliases:['vs intl acquirer fee','visa international acquirer fee'],
+  frequency:'volume_based',
+  negotiable:false,
+  published:true,
+  patterns:[/\bvs intl acquirer fee\b/i,/\bvisa international acquirer fee\b/i],
+  ruleId:'CC-FT-1010'
+},
 ]);
 
 export function getFeeRegistry(){return FEE_REGISTRY.map(item=>({...item,aliases:[...item.aliases],patterns:[...item.patterns]}));}
