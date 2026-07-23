@@ -160,6 +160,27 @@ const result = await runStatementIntelligencePipeline(
     'preserved interchange rows retain provenance'
   );
 
+  // A verified Commerce Control category label is sufficient to classify an
+  // otherwise unfamiliar card-program description.  The original description
+  // and provenance stay intact; only service/fee rows without a specific rule
+  // remain in the unknown queue.
+  assert.ok(
+    interchange.every(f => f.status === 'classified'),
+    'all verified interchange/program rows are classified'
+  );
+  assert.ok(
+    interchange.every(f => f.category === 'interchange'),
+    'interchange/program rows use the interchange category'
+  );
+  assert.ok(
+    interchange.every(f => f.bucket === 'wholesale_interchange'),
+    'interchange/program rows use the wholesale bucket'
+  );
+  assert.ok(
+    interchange.every(f => !result.unknownFees.includes(f)),
+    'classified interchange/program rows are absent from the unknown queue'
+  );
+
   // Interchange/program net (charges − credits) equals the printed component
   // total −$1,403.91 (integer cents).
   const interchangeCents = interchange.reduce(
