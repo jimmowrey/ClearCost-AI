@@ -9,29 +9,41 @@
     consultantName: "",
     phone: "",
     email: "",
-    isoProcessorName: "SignaPay",
-    agentSplitPercent: 80,
-    agentSplitVerified: true,
+    isoProcessorName: "",
+    agentSplitPercent: null,
+    agentSplitVerified: false,
     minimumMonthlyResidual: 500,
   });
 
-  function finiteNumber(value, fallback) {
+  function optionalFiniteNumber(value, fallback) {
+    if (value === null || value === undefined || String(value).trim() === "") {
+      return fallback;
+    }
+
     const parsed = Number(value);
     return Number.isFinite(parsed) ? parsed : fallback;
   }
 
   function normalizeAgentSettings(value) {
     const source = value && typeof value === "object" ? value : {};
-    const split = finiteNumber(
+    const split = optionalFiniteNumber(
       source.agentSplitPercent,
       DEFAULTS.agentSplitPercent
     );
+    const isoProcessorName = String(source.isoProcessorName || "").trim();
+    const agentSplitVerified = source.agentSplitVerified === true;
 
-    if (split < 0 || split > 100) {
+    if (split !== null && (split < 0 || split > 100)) {
       throw new Error("Agent residual split must be between 0 and 100.");
     }
 
-    const minimum = finiteNumber(
+    if (agentSplitVerified && (split === null || !isoProcessorName)) {
+      throw new Error(
+        "ISO / processor and agent residual split are required before verification."
+      );
+    }
+
+    const minimum = optionalFiniteNumber(
       source.minimumMonthlyResidual,
       DEFAULTS.minimumMonthlyResidual
     );
@@ -45,11 +57,9 @@
       consultantName: String(source.consultantName || "").trim(),
       phone: String(source.phone || "").trim(),
       email: String(source.email || "").trim(),
-      isoProcessorName: String(
-        source.isoProcessorName || DEFAULTS.isoProcessorName
-      ).trim(),
+      isoProcessorName,
       agentSplitPercent: split,
-      agentSplitVerified: source.agentSplitVerified === true,
+      agentSplitVerified,
       minimumMonthlyResidual: minimum,
     });
   }
