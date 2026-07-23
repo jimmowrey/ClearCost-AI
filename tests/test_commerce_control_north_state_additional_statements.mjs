@@ -36,6 +36,8 @@ function assertRedacted(fileName) {
     join(here, '..', 'data', 'regression', fileName),
     'utf8'
   );
+  const fixture = JSON.parse(fixtureText);
+  const statementText = fixture.pages.map(page => page.full_text).join('\n');
   for (const identifier of [
     'NORTHSTATE',
     'POWERSPORTS',
@@ -50,6 +52,11 @@ function assertRedacted(fileName) {
   const remainingLongIds = (fixtureText.match(/(?<!\d)\d{12}(?!\d)/g) || [])
     .filter(value => value !== '000000000000');
   assert.deepEqual(remainingLongIds, [], `${fileName} contains no account/batch identifiers`);
+  assert.doesNotMatch(
+    statementText,
+    /GROSS REPORTABLE SALES-TIN[^\n]*\d/,
+    `${fileName} redacts the complete TIN, including its last four digits`
+  );
 }
 
 const decemberFile = 'north_state_power_sports_commerce_control_2024_12.json';
