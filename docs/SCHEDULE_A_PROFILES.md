@@ -16,6 +16,18 @@ The first implementation:
 - creates a new immutable version instead of overwriting an older schedule;
 - leaves extraction pending and economics unverified after upload.
 
+## Extraction and review
+
+The next layer reads text-layer PDFs directly and runs in-browser OCR for
+scanned Schedule A pages. Extraction creates candidate terms with the original
+source wording retained as evidence. It does not verify terms automatically.
+
+The agent must compare every candidate with the source PDF, correct any OCR
+error, add any row the extractor missed, and explicitly verify every row. Final
+verification also requires the agent to confirm that every source row is
+represented. A partially reviewed schedule remains unverified and cannot be
+used by Profit Intelligence.
+
 An upload is not evidence that the document was understood. Profit Intelligence
 must remain blocked until every required term is extracted and the agent
 verifies the extracted schedule.

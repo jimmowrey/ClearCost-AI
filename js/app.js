@@ -1899,10 +1899,198 @@ function renderScheduleAProfiles() {
         `<strong>${escapeHtml(profile.isoProcessorName)}</strong>` +
         `<p>Effective ${escapeHtml(profile.effectiveDate)} · ` +
         `${escapeHtml(profile.fileName)}</p>` +
-        `<small>Extraction pending · Terms not verified</small>` +
+        `<small>${profile.extractionStatus === 'extracted'
+          ? `${profile.terms.length} terms extracted`
+          : 'Extraction pending'} · ` +
+        `${profile.termsVerified ? 'Terms verified' : 'Terms not verified'}</small>` +
+        `<button class="secondary full-width schedule-a-action" type="button" ` +
+        `data-profile-id="${escapeHtml(profile.id)}">` +
+        `${profile.extractionStatus === 'extracted' ? 'Review Terms' : 'Extract Terms'}` +
+        `</button>` +
         `</article>`
       ).join('')
     : '<div class="empty-state">No Schedule A versions uploaded.</div>';
+}
+
+async function scheduleAPdfText(pdfBlob, status) {
+  const bytes = new Uint8Array(await pdfBlob.arrayBuffer());
+  const pdf = await pdfjsLib.getDocument({ data: bytes }).promise;
+  const pageRecords = [];
+  for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber += 1) {
+    const page = await pdf.getPage(pageNumber);
+    const content = await page.getTextContent();
+    pageRecords.push({
+      page,
+      text: content.items.map(item => item.str).join('\n').trim()
+    });
+  }
+  const directText = pageRecords.map(record => record.text).join('\n');
+  if (countMeaningfulTextCharacters(directText) >= 100) {
+    return { text: directText, source: 'pdf_text' };
+  }
+
+  if (status) {
+    status.innerHTML =
+      `<div class="notice warning"><strong>Scanned PDF detected</strong>` +
+      `<p>Running OCR locally on this device. This can take a minute.</p></div>`;
+  }
+  const { createWorker } = await import(
+    'https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.esm.min.js'
+  );
+  const worker = await createWorker('eng', 1, {
+    logger(message) {
+      if (status && message.status === 'recognizing text') {
+        status.innerHTML =
+          `<div class="notice warning"><strong>Reading Schedule A</strong>` +
+          `<p>OCR ${Math.round((message.progress || 0) * 100)}% complete</p></div>`;
+      }
+    }
+  });
+  const pageTexts = [];
+  try {
+    for (const record of pageRecords) {
+      const viewport = record.page.getViewport({ scale: 2 });
+      const canvas = document.createElement('canvas');
+      canvas.width = Math.ceil(viewport.width);
+      canvas.height = Math.ceil(viewport.height);
+      await record.page.render({
+        canvasContext: canvas.getContext('2d'),
+        viewport
+      }).promise;
+      const result = await worker.recognize(canvas);
+      pageTexts.push(result.data.text || '');
+    }
+  } finally {
+    await worker.terminate();
+  }
+  return { text: pageTexts.join('\n'), source: 'ocr' };
+}
+
+function renderScheduleAReview(profile) {
+  const review = $('scheduleAReview');
+  if (!review) return;
+  if (!profile || profile.extractionStatus !== 'extracted') {
+    review.innerHTML = '';
+    return;
+  }
+  review.innerHTML =
+    `<div class="queue-header"><h3>Review Extracted Terms</h3></div>` +
+    `<div class="notice warning"><strong>Agent verification required</strong>` +
+    `<p>Compare every value with the source PDF. Edit any OCR error, then check every row.</p></div>` +
+    `<div class="settings-card" data-review-profile="${escapeHtml(profile.id)}">` +
+    profile.terms.map((term, index) =>
+      `<div class="schedule-term" data-term-index="${index}">` +
+      `<strong class="schedule-term-label">${escapeHtml(term.label)}</strong>` +
+      `<label><input class="schedule-term-verified" type="checkbox" ` +
+      `${term.verified ? 'checked' : ''}> Verified</label>` +
+      `<input class="schedule-term-value" type="text" value="${escapeHtml(term.value)}" ` +
+      `aria-label="${escapeHtml(term.label)} value">` +
+      `<small>${escapeHtml(term.scope)} · Source: ${escapeHtml(term.evidence)}</small>` +
+      `</div>`
+    ).join('') +
+    `</div>` +
+    `<button id="addScheduleATerm" class="secondary full-width" type="button">` +
+    `Add Missing Term</button>` +
+    `<div class="settings-card"><label><input id="confirmScheduleACoverage" ` +
+    `type="checkbox"> I confirm every row in the source Schedule A is represented</label></div>` +
+    `<button id="verifyScheduleATerms" class="primary full-width" type="button">` +
+    `Save Verified Terms</button>`;
+  $('addScheduleATerm').onclick = addMissingScheduleATerm;
+  $('verifyScheduleATerms').onclick = () => verifyScheduleATerms(profile.id);
+  review.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function addMissingScheduleATerm() {
+  const container = document.querySelector('[data-review-profile]');
+  if (!container) return;
+  container.insertAdjacentHTML(
+    'beforeend',
+    `<div class="schedule-term" data-manual-term="true">` +
+    `<input class="schedule-term-label-input" type="text" placeholder="Missing term name" ` +
+    `aria-label="Missing term name">` +
+    `<label><input class="schedule-term-verified" type="checkbox"> Verified</label>` +
+    `<input class="schedule-term-value" type="text" placeholder="Cost or rate" ` +
+    `aria-label="Missing term value">` +
+    `<small>manual · Entered during source review</small></div>`
+  );
+}
+
+async function extractScheduleATerms(profileId) {
+  const status = $('scheduleAStatus');
+  try {
+    const profile = scheduleARegistry.load().find(item => item.id === profileId);
+    if (!profile) throw new Error('Schedule A version was not found.');
+    if (profile.extractionStatus === 'extracted') {
+      renderScheduleAReview(profile);
+      return;
+    }
+    const pdfBlob = await scheduleADocumentStore.get(profile.documentStorageKey);
+    if (!pdfBlob) throw new Error('The original Schedule A PDF is unavailable on this device.');
+    const extractedText = await scheduleAPdfText(pdfBlob, status);
+    const extraction = window.ClearCostScheduleAExtraction.extractionResult(
+      extractedText.text,
+      extractedText.source
+    );
+    if (!extraction.terms.length) {
+      throw new Error('No pricing terms could be extracted. Manual review is required.');
+    }
+    const updated = scheduleARegistry.saveExtraction(profile.id, extraction);
+    renderScheduleAProfiles();
+    renderScheduleAReview(updated);
+    status.innerHTML =
+      `<div class="notice ok"><strong>Extraction complete</strong>` +
+      `<p>${updated.terms.length} candidate terms found. Verify every term before use.</p></div>`;
+  } catch (error) {
+    if (status) {
+      status.innerHTML =
+        `<div class="notice error"><strong>Schedule A extraction failed</strong>` +
+        `<p>${escapeHtml(String(error.message || error))}</p></div>`;
+    }
+  }
+}
+
+function verifyScheduleATerms(profileId) {
+  const status = $('scheduleAStatus');
+  try {
+    const profile = scheduleARegistry.load().find(item => item.id === profileId);
+    if (!profile) throw new Error('Schedule A version was not found.');
+    const rows = Array.from(document.querySelectorAll(
+      `[data-review-profile="${CSS.escape(profileId)}"] .schedule-term`
+    ));
+    const terms = rows.map((row, index) => {
+      const existing = profile.terms[index];
+      const manualLabel = row.querySelector('.schedule-term-label-input')?.value.trim();
+      return {
+        ...(existing || {
+          id: `manual_${index}`,
+          scope: 'manual',
+          evidence: 'Entered during agent source review',
+          confidence: 1
+        }),
+        label: existing?.label || manualLabel,
+        value: row.querySelector('.schedule-term-value').value.trim(),
+        verified: row.querySelector('.schedule-term-verified').checked
+      };
+    });
+    if (terms.some(term => !term.label || !term.value)) {
+      throw new Error('Every term must have a name and value.');
+    }
+    const verified = scheduleARegistry.verifyTerms(
+      profileId,
+      terms,
+      new Date(),
+      $('confirmScheduleACoverage')?.checked === true
+    );
+    renderScheduleAProfiles();
+    renderScheduleAReview(verified);
+    status.innerHTML =
+      `<div class="notice ok"><strong>Schedule A terms verified</strong>` +
+      `<p>${verified.terms.length} reviewed terms saved for this exact version.</p></div>`;
+  } catch (error) {
+    status.innerHTML =
+      `<div class="notice error"><strong>Terms not verified</strong>` +
+      `<p>${escapeHtml(String(error.message || error))}</p></div>`;
+  }
 }
 
 async function sha256Hex(file) {
@@ -2566,6 +2754,13 @@ const uploadScheduleAButton =
 if (uploadScheduleAButton) {
   uploadScheduleAButton.onclick =
     uploadScheduleA;
+}
+
+if ($('scheduleAList')) {
+  $('scheduleAList').onclick = event => {
+    const button = event.target.closest('.schedule-a-action');
+    if (button) extractScheduleATerms(button.dataset.profileId);
+  };
 }
 
 applyAgentSettingsToForm();

@@ -136,6 +136,43 @@
         storage.setItem(STORAGE_KEY, JSON.stringify(updated));
         return normalized;
       },
+      saveExtraction(profileId, extraction) {
+        const profiles = load();
+        const index = profiles.findIndex(item => item.id === profileId);
+        if (index < 0) throw new Error("Schedule A version was not found.");
+        const terms = Array.isArray(extraction?.terms) ? extraction.terms : [];
+        if (!terms.length) throw new Error("No Schedule A terms were extracted.");
+        profiles[index] = normalizeProfile({
+          ...profiles[index],
+          extractionStatus: "extracted",
+          termsVerified: false,
+          verifiedAt: null,
+          terms,
+        });
+        storage.setItem(STORAGE_KEY, JSON.stringify(profiles));
+        return profiles[index];
+      },
+      verifyTerms(profileId, terms, verifiedAt = new Date(), coverageConfirmed = false) {
+        const profiles = load();
+        const index = profiles.findIndex(item => item.id === profileId);
+        if (index < 0) throw new Error("Schedule A version was not found.");
+        const reviewed = Array.isArray(terms) ? terms : [];
+        if (!reviewed.length || reviewed.some(term => term.verified !== true)) {
+          throw new Error("Review and verify every extracted term first.");
+        }
+        if (coverageConfirmed !== true) {
+          throw new Error("Confirm that every Schedule A row is represented.");
+        }
+        profiles[index] = normalizeProfile({
+          ...profiles[index],
+          extractionStatus: "extracted",
+          termsVerified: true,
+          verifiedAt: verifiedAt.toISOString(),
+          terms: reviewed,
+        });
+        storage.setItem(STORAGE_KEY, JSON.stringify(profiles));
+        return profiles[index];
+      },
     });
   }
 
@@ -167,6 +204,17 @@
           transaction.onerror = () => reject(transaction.error);
         });
         db.close();
+      },
+      async get(key) {
+        const db = await openDatabase();
+        const result = await new Promise((resolve, reject) => {
+          const transaction = db.transaction(DOCUMENT_STORE, "readonly");
+          const request = transaction.objectStore(DOCUMENT_STORE).get(key);
+          request.onsuccess = () => resolve(request.result || null);
+          request.onerror = () => reject(request.error);
+        });
+        db.close();
+        return result;
       },
     });
   }
