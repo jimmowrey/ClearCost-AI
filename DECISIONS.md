@@ -4,6 +4,84 @@ Architectural decision record for ClearCost AI. Newest entries first.
 
 ---
 
+## 2026-07-23 — Commerce Control live-statement fee extraction ($1,501.57)
+
+**Status:** Accepted. Corrects the reconciliation model against the real statement.
+
+### Problem
+
+Run against the actual North State Power Sports PDF
+(`North_State_Power_Sports_Statement_1.pdf`, extracted with pdf.js 4.10.38 exactly
+as `js/app.js` does), the Commerce Control extractor mis-parsed the text layer:
+~110 fee candidates with a reconciliation-eligible total of ~$9,852 against a
+printed statement total of $1,501.57 — an $8,350 variance, not reconciled. The
+leak came from summary/overview, component-total, and volume rows (whose
+description column extracts as a bare `-` or a numeric value) being captured as
+`single_line_fee_unlabeled` fees, and from the earlier 8-line interchange-table
+parser, which did not match this statement's layout.
+
+The earlier tactical model (2026-07-20) assumed interchange/program detail rows
+were **duplicates** to exclude from reconciliation, reconciling a *synthetic*
+statement to $909.75. The real statement disproves that: it prints
+`Total (Service Charges, Interchange Charges/Program Fees, and Fees) -$1,501.57`,
+so interchange/program charges ($1,403.91) are a **real component** of the fee
+total, not a duplicate. `$909.75` and `$1,043.19` do not appear in the statement.
+
+### Decision
+
+Add a dedicated Commerce Control fee-row parser (`js/statement-extraction.js`).
+Commerce Control renders every charged fee as a three-line row:
+`[description, category label, signed amount]`, where the category label is one
+of `Interchange charges | Service charges | Fees | Program Fees` and the amount
+sits immediately after the label. The parser anchors on the category label,
+reconstructs the description by walking back over numeric/formula continuation
+lines, normalises sign (charge `-$X` → positive cost, credit `$X` → negative
+cost), and rejects summary/overview rows (the `Total …`/`TOTAL` labels are not
+exact category labels and never anchor; the single overview row that does anchor
+resolves its description head to a summary label such as `Adjustments` and is
+filtered). These rows are ordinary reconciliation-eligible fees.
+
+### Reasoning
+
+- **Accuracy / no fabrication:** reconciliation now reproduces the statement's
+  own printed total, $1,501.57, cent-exact (Interchange/Program $1,403.91 +
+  Service $85.58 + Fees $12.08). Nothing is suppressed to force a target.
+- **Charter compliance:** every charged fee is preserved; interchange/program
+  detail keeps per-row provenance for analysis; integer-cent arithmetic.
+- **Scope containment:** the parser runs only for Commerce Control; the generic
+  non-interchange fee pass is skipped for Commerce Control and unchanged for
+  every other processor.
+
+### Consequences
+
+- The `commerce_control_interchange_table_row` extraction method and the
+  reconciliation-eligible **exclusion** it relied on are no longer produced by
+  extraction. The generic exclusion mechanism in `js/fee-intelligence.js`
+  (`RECONCILIATION_EXCLUDED_EXTRACTION_METHODS`, `isReconciliationEligible`, and
+  the eligible-total helpers) is retained as generic infrastructure and still
+  unit-tested by `tests/test_commerce_control_reconciliation.mjs`, but no longer
+  encodes live Commerce Control behaviour.
+
+### Regression tests
+
+- `tests/test_commerce_control_north_state_reconciliation.mjs` — real-PDF-derived
+  fixture (`data/regression/north_state_power_sports_commerce_control.json`)
+  through the full pipeline: processor = Commerce Control, reconciles to
+  $1,501.57 (`feeVarianceCents === 0`), interchange/program net = $1,403.91,
+  summary/total/volume rows rejected, and the surfaced Fees-found / Unknown-fee
+  metrics are asserted.
+
+### Follow-up completed
+
+- The former `tests/test_commerce_control_reconciliation.mjs` (which narrated the
+  superseded $909.75 synthetic scenario) has been renamed to
+  `tests/test_reconciliation_eligible_arithmetic.mjs` and reframed as a synthetic
+  reconciliation-eligible/arithmetic unit test. Its assertions remain valid; it
+  no longer claims $909.75 is the North State Power Sports statement total. The
+  prior 2026-07-20 entries below are superseded on that point.
+
+---
+
 ## 2026-07-20 — Processor Intelligence Engine (explainable detection layer)
 
 **Status:** Accepted. Additive, standalone (not wired into the live pipeline this sprint).
@@ -36,8 +114,10 @@ via a reusable validator (`js/rule-pack-health.js`).
 ### Consequences
 
 - The global confidence threshold (0.5) is unchanged; no match is forced.
-- Generic fallback, Commerce Control detection, and Commerce Control
-  reconciliation at exactly $909.75 are preserved.
+- Generic fallback and Commerce Control detection are preserved. (The
+  Commerce Control reconciliation figure of $909.75 referenced here was a
+  synthetic assumption, superseded 2026-07-23: the real North State Power Sports
+  statement reconciles to $1,501.57.)
 - Confidence normalization is documented and deterministic:
   `confidence = round2(min(rawScore / normalizationBase, 1))`, ordering by
   integer `rawScore` desc then `processorId` asc.
@@ -47,16 +127,23 @@ via a reusable validator (`js/rule-pack-health.js`).
 
 ## 2026-07-20 — Commerce Control reconciliation eligible total
 
-**Status:** Accepted (tactical). Rule Pack migration deferred to a separate branch/PR.
+**Status:** SUPERSEDED by the 2026-07-23 entry above. This entry was based on a
+synthetic model of the statement (interchange detail assumed to be a duplicate,
+reconciling to $909.75). The real North State Power Sports statement disproves
+both assumptions: interchange/program charges are a genuine fee component and
+the statement reconciles to **$1,501.57**. The `$909.75` figure below is NOT the
+real statement total; it is retained here only as the historical record of the
+superseded decision. The generic exclusion mechanism this entry introduced still
+exists but is no longer produced by live Commerce Control extraction.
 
-### Problem
+### Problem (as understood at the time — since disproven)
 
-North State Power Sports Commerce Control statements emit interchange/program
-detail rows (pages 6–7) as fee candidates carrying the metadata
-`extractionMethod === "commerce_control_interchange_table_row"`. Those rows are
-also represented in the statement's summarised fee section. Reconciliation
-summed `extraction.feeSummary.totalAmount`, which counted the detail rows twice
-and prevented reconciling to the statement's printed total of **$909.75**.
+The synthetic model assumed North State Power Sports Commerce Control statements
+emit interchange/program detail rows as fee candidates carrying
+`extractionMethod === "commerce_control_interchange_table_row"` that were *also*
+represented in a summarised fee section, so reconciliation summed
+`extraction.feeSummary.totalAmount` and double-counted them, preventing
+reconciliation to an assumed printed total of **$909.75**.
 
 ### Decision
 
@@ -88,18 +175,20 @@ eligible.
   and `reconciliationEligibleTotal` alongside the unchanged `totalAmount`.
 - `js/statement-intelligence-pipeline.js` — reconciliation now uses
   `feeSummary.reconciliationEligibleTotal` instead of `feeSummary.totalAmount`.
-- Result: reconciliation reproduces exactly to **$909.75**
-  (`feeVarianceCents === 0`).
+- Result (synthetic model): reconciliation reproduced the assumed $909.75 total
+  (`feeVarianceCents === 0`). Superseded — the real statement total is $1,501.57.
 
-### Regression tests added
+### Regression tests added (since renamed/reframed)
 
-- `tests/test_commerce_control_reconciliation.mjs` proves:
-  - Commerce Control detail rows remain preserved among fee candidates.
+- `tests/test_reconciliation_eligible_arithmetic.mjs` (formerly
+  `tests/test_commerce_control_reconciliation.mjs`) proves, with synthetic
+  hand-built candidates:
+  - Rows tagged with the excluded method remain preserved among fee candidates.
   - They are excluded **only** from the reconciliation-eligible total.
-  - Other processors' interchange detail remains fully eligible.
-  - Reconciliation equals **$909.75**.
+  - Rows using any other extraction method remain fully eligible.
+  - The reconciliation arithmetic reconciles the illustrative eligible total.
   - Negative test: reconciling the un-adjusted `totalAmount` would **fail** to
-    reconcile, proving the fix is load-bearing.
+    reconcile, proving the mechanism is load-bearing.
 
 ### Commit reference
 

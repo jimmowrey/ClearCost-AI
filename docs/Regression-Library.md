@@ -20,7 +20,8 @@ Tests are deterministic and require no network access.
 
 | Test file | Covers | Related decision |
 |-----------|--------|------------------|
-| `tests/test_commerce_control_reconciliation.mjs` | Commerce Control reconciliation-eligible total; $909.75 reconciliation | `DECISIONS.md` 2026-07-20 |
+| `tests/test_commerce_control_north_state_reconciliation.mjs` | Commerce Control real-statement fee-row extraction driven from the actual North State Power Sports PDF text layer; reconciles to the printed $1,501.57; rejects summary/total/volume rows; preserves interchange/program detail; asserts Fees-found / Unknown-fee metrics | `DECISIONS.md` 2026-07-23 |
+| `tests/test_reconciliation_eligible_arithmetic.mjs` | Synthetic reconciliation-eligible mechanism + integer-cent arithmetic (hand-built candidates; the $909.75 figure is illustrative, not a real statement total) | `DECISIONS.md` 2026-07-20 |
 | `tests/test_processor_intelligence_commerce_control.mjs` | Commerce Control rule pack detection; evidence-based, threshold not weakened | Sprint 5.3 |
 | `tests/test_processor_intelligence_engine.mjs` | Candidate ranking, evidence explainability, runner-ups, unknown-processor evidence, rule pack health, deterministic ordering | Sprint 5.4 |
 | `tests/test_reconciliation_readiness.mjs` | Reconciliation status, tolerance, integer cents | — |

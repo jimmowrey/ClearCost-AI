@@ -26,6 +26,20 @@ under `Unreleased` until a versioning scheme is adopted (see `docs/Roadmap.md`).
   than the raw fee summary total.
 
 ### Fixed
+- Commerce Control live-statement fee extraction. On the real North State Power
+  Sports statement the extractor mis-parsed the text layer: it produced ~110 fee
+  candidates and a reconciliation-eligible total of ~$9,852 (interchange/program
+  summary, component-total, and volume rows leaking in as unlabeled fees), so the
+  statement did not reconcile. A dedicated Commerce Control fee-row parser now
+  captures each `[description, category label, signed amount]` row exactly once,
+  reconstructs formula descriptions, normalises charges/credits by sign, and
+  rejects summary/overview rows. The statement reconciles to its printed total of
+  **$1,501.57** (Interchange Charges/Program Fees $1,403.91 + Service Charges
+  $85.58 + Fees $12.08), with interchange/program detail preserved for analysis.
+  Real-PDF-derived regression:
+  `tests/test_commerce_control_north_state_reconciliation.mjs`. Non–Commerce
+  Control processors are unaffected (their extraction path is unchanged). See
+  `DECISIONS.md` (2026-07-23).
 - Commerce Control statement double-counting that prevented reconciliation to
   the printed fee total. See `DECISIONS.md` (2026-07-20).
 - Restored the `cardVolume` statement metric, which a WIP debugging commit had
@@ -35,8 +49,8 @@ under `Unreleased` until a versioning scheme is adopted (see `docs/Roadmap.md`).
   fee section are now preserved as `needs_review` (with page/line provenance)
   instead of being discarded, so unknown fees stay visible. Totals, subtotals,
   volumes, transaction counts, rates, and dates are still excluded, and
-  interchange detail rows (and Commerce Control's $909.75 reconciliation) are
-  unaffected.
+  interchange detail rows (and the synthetic reconciliation-eligible arithmetic)
+  are unaffected.
 
 ### Notes
 - No application behavior changed in the engineering-foundation documentation
