@@ -26,9 +26,9 @@ assert.ok(Settings, "Agent Settings module should load.");
   const store = Settings.createAgentSettingsStore(storage);
   const defaults = store.load();
 
-  assert.equal(defaults.isoProcessorName, "SignaPay");
-  assert.equal(defaults.agentSplitPercent, 80);
-  assert.equal(defaults.agentSplitVerified, true);
+  assert.equal(defaults.isoProcessorName, "");
+  assert.equal(defaults.agentSplitPercent, null);
+  assert.equal(defaults.agentSplitVerified, false);
 
   const updated = store.save({
     isoProcessorName: "Another ISO",
@@ -40,6 +40,18 @@ assert.ok(Settings, "Agent Settings module should load.");
   assert.equal(updated.isoProcessorName, "Another ISO");
   assert.equal(store.load().agentSplitPercent, 65);
   assert.equal(store.load().minimumMonthlyResidual, 750);
+}
+
+{
+  assert.throws(
+    () =>
+      Settings.normalizeAgentSettings({
+        isoProcessorName: "",
+        agentSplitPercent: "",
+        agentSplitVerified: true,
+      }),
+    /required before verification/
+  );
 }
 
 {
@@ -61,8 +73,9 @@ assert.ok(Settings, "Agent Settings module should load.");
   };
   const restored = Settings.createAgentSettingsStore(storage).load();
 
-  assert.equal(restored.isoProcessorName, "SignaPay");
-  assert.equal(restored.agentSplitPercent, 80);
+  assert.equal(restored.isoProcessorName, "");
+  assert.equal(restored.agentSplitPercent, null);
+  assert.equal(restored.agentSplitVerified, false);
 }
 
 console.log("Agent Settings regression tests passed.");
