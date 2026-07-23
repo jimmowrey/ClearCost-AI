@@ -45,6 +45,55 @@ function makeSections(entries) {
   assert.ok(metrics.transactionCount.confidence >= 0.90);
 }
 
+// Reconciled summary Total row uses submitted items, not gross-sale items
+{
+  const pages = [{
+    index: 1,
+    text: [
+      'Total Gross Sales You Submitted',
+      'Refunds',
+      'Total Amount You Submitted',
+      'Items',
+      'Amount',
+      'Total',
+      '317',
+      '$82,966.39',
+      '2',
+      '-$210.27',
+      '319',
+      '$82,756.12'
+    ].join('\n')
+  }];
+  const metrics = extractStatementMetrics([], pages);
+  assert.equal(metrics.transactionCount.status, 'found');
+  assert.equal(metrics.transactionCount.value, 319);
+  assert.equal(metrics.transactionCount.formula, 'reconciled_summary_total_row');
+}
+
+// A Total row whose counts or cents do not reconcile is not accepted
+{
+  const pages = [{
+    index: 1,
+    text: [
+      'Total Gross Sales You Submitted',
+      'Refunds',
+      'Total Amount You Submitted',
+      'Items',
+      'Amount',
+      'Total',
+      '317',
+      '$82,966.39',
+      '2',
+      '-$210.27',
+      '318',
+      '$82,756.12'
+    ].join('\n')
+  }];
+  const metrics = extractStatementMetrics([], pages);
+  assert.notEqual(metrics.transactionCount.formula, 'reconciled_summary_total_row');
+  assert.notEqual(metrics.transactionCount.value, 318);
+}
+
 // Total fees extraction
 {
   const sections = makeSections([
