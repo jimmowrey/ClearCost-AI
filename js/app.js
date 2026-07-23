@@ -10,6 +10,7 @@ import {
 } from './pdf-validation.js';
 import { runStatementIntelligencePipeline } from './statement-intelligence-pipeline.js';
 import './profit-intelligence.js';
+import './agent-settings.js';
 
 pdfjsLib.GlobalWorkerOptions.workerSrc =
   'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.10.38/pdf.worker.min.mjs';
@@ -21,6 +22,13 @@ const state = {
   profitScenario: null,
   currentScreen: 'home'
 };
+
+const agentSettingsStore =
+  window.ClearCostAgentSettings
+    .createAgentSettingsStore(window.localStorage);
+
+let agentSettings =
+  agentSettingsStore.load();
 
 const titles = {
   home: 'Home',
@@ -1792,6 +1800,87 @@ function updateProfitFieldVisibility() {
     );
 }
 
+function applyAgentSettingsToProfit() {
+  if ($('profitIsoProcessor')) {
+    $('profitIsoProcessor').value =
+      agentSettings.isoProcessorName;
+  }
+
+  if ($('agentSplit')) {
+    $('agentSplit').value =
+      agentSettings.agentSplitPercent ?? '';
+  }
+
+  if ($('verifyAgentSplit')) {
+    $('verifyAgentSplit').checked =
+      agentSettings.agentSplitVerified;
+  }
+
+  if ($('minimumResidualProfit')) {
+    $('minimumResidualProfit').value =
+      agentSettings.minimumMonthlyResidual;
+  }
+}
+
+function applyAgentSettingsToForm() {
+  const fields = {
+    settingsConsultantName: agentSettings.consultantName,
+    settingsPhone: agentSettings.phone,
+    settingsEmail: agentSettings.email,
+    settingsIsoProcessor: agentSettings.isoProcessorName,
+    settingsAgentSplit: agentSettings.agentSplitPercent ?? '',
+    settingsMinimumResidual: agentSettings.minimumMonthlyResidual
+  };
+
+  for (const [id, value] of Object.entries(fields)) {
+    if ($(id)) $(id).value = value;
+  }
+
+  if ($('settingsAgentSplitVerified')) {
+    $('settingsAgentSplitVerified').checked =
+      agentSettings.agentSplitVerified;
+  }
+
+  applyAgentSettingsToProfit();
+}
+
+function saveAgentSettings() {
+  const status = $('agentSettingsStatus');
+
+  try {
+    agentSettings = agentSettingsStore.save({
+      consultantName: $('settingsConsultantName')?.value,
+      phone: $('settingsPhone')?.value,
+      email: $('settingsEmail')?.value,
+      isoProcessorName: $('settingsIsoProcessor')?.value,
+      agentSplitPercent: $('settingsAgentSplit')?.value,
+      agentSplitVerified:
+        $('settingsAgentSplitVerified')?.checked === true,
+      minimumMonthlyResidual:
+        $('settingsMinimumResidual')?.value
+    });
+
+    applyAgentSettingsToForm();
+
+    if (status) {
+      status.innerHTML =
+        `<div class="notice ok">` +
+        `<strong>Agent settings saved</strong>` +
+        `<p>${escapeHtml(agentSettings.isoProcessorName || 'ISO not set')} · ` +
+        `${agentSettings.agentSplitPercent ?? 'Split not set'}${agentSettings.agentSplitPercent === null ? '' : '% agent split'}</p>` +
+        `</div>`;
+    }
+  } catch (error) {
+    if (status) {
+      status.innerHTML =
+        `<div class="notice error">` +
+        `<strong>Settings not saved</strong>` +
+        `<p>${escapeHtml(String(error.message || error))}</p>` +
+        `</div>`;
+    }
+  }
+}
+
 function buildProfitScenario() {
   const PI =
     window
@@ -1999,7 +2088,9 @@ function buildProfitScenario() {
       V(
         split,
         splitVerified,
-        'Profit Intelligence input'
+        agentSettings.isoProcessorName
+          ? `Agent Settings: ${agentSettings.isoProcessorName}`
+          : 'Agent Settings'
       ),
 
     minimumMonthlyResidual:
@@ -2278,6 +2369,7 @@ function openProfitability() {
     }
   }
 
+  applyAgentSettingsToProfit();
   updateProfitFieldVisibility();
 
   navigate(
@@ -2390,6 +2482,16 @@ if (
   profitProgram.onchange =
     updateProfitFieldVisibility;
 }
+
+const saveAgentSettingsButton =
+  $('saveAgentSettings');
+
+if (saveAgentSettingsButton) {
+  saveAgentSettingsButton.onclick =
+    saveAgentSettings;
+}
+
+applyAgentSettingsToForm();
 
 renderQueue();
 
