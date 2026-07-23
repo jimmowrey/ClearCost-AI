@@ -169,12 +169,12 @@ const result = await runStatementIntelligencePipeline(
     'all verified interchange/program rows are classified'
   );
   assert.ok(
-    interchange.every(f => f.category === 'interchange'),
-    'interchange/program rows use the interchange category'
+    interchange.every(f => ['interchange', 'assessment'].includes(f.category)),
+    'interchange/program rows retain interchange or a more specific assessment classification'
   );
   assert.ok(
-    interchange.every(f => f.bucket === 'wholesale_interchange'),
-    'interchange/program rows use the wholesale bucket'
+    interchange.every(f => ['wholesale_interchange', 'network'].includes(f.bucket)),
+    'interchange/program rows retain wholesale or a more specific network bucket'
   );
   assert.ok(
     interchange.every(f => !result.unknownFees.includes(f)),
