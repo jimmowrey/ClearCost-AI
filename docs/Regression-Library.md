@@ -20,6 +20,7 @@ Tests are deterministic and require no network access.
 
 | Test file | Covers | Related decision |
 |-----------|--------|------------------|
+| `tests/test_commerce_control_north_state_additional_statements.mjs` | Real-statement December 2024 and February 2025 Commerce Control detection, split-description recovery, complete processor-scoped fee classification, submitted transaction metrics, and exact reconciliation; includes negative Fiserv and unrelated-processor coverage | 2026-07-23 North State additional-statement verification |
 | `tests/test_commerce_control_north_state_reconciliation.mjs` | Commerce Control real-statement fee-row extraction driven from the actual North State Power Sports PDF text layer; reconciles to the printed $1,501.57; rejects summary/total/volume rows; preserves interchange/program detail; asserts Fees-found / Unknown-fee metrics | `DECISIONS.md` 2026-07-23 |
 | `tests/test_reconciliation_eligible_arithmetic.mjs` | Synthetic reconciliation-eligible mechanism + integer-cent arithmetic (hand-built candidates; the $909.75 figure is illustrative, not a real statement total) | `DECISIONS.md` 2026-07-20 |
 | `tests/test_processor_intelligence_commerce_control.mjs` | Commerce Control rule pack detection; evidence-based, threshold not weakened | Sprint 5.3 |
