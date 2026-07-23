@@ -266,6 +266,13 @@ export function classifyFeeCandidate(
     best.score <
       threshold
   ) {
+    /*
+     * Commerce Control's fee-row parser supplies verified statement context
+     * even when a card-program description has no registry alias.  Only rows
+     * anchored to the statement's Interchange charges or Program Fees labels
+     * receive this fallback.  Service charges and Fees remain unknown until a
+     * specific fee rule identifies their economic meaning.
+     */
     const commerceControlCategory =
       candidate.extractionMethod ===
         'commerce_control_fee_row'
@@ -280,44 +287,59 @@ export function classifyFeeCandidate(
     ) {
       return {
         ...candidate,
+
         canonicalId:
           commerceControlCategory ===
             'program'
             ? 'CCF-CC-PROGRAM-DETAIL'
             : 'CCF-CC-INTERCHANGE-DETAIL',
+
         standardName:
           commerceControlCategory ===
             'program'
             ? 'Commerce Control Program Interchange Detail'
             : 'Commerce Control Interchange Detail',
+
         category:
           'interchange',
+
         subcategory:
           commerceControlCategory ===
             'program'
             ? 'program_interchange_detail'
             : 'interchange_detail',
+
         bucket:
           'wholesale_interchange',
+
         suggestedBucket:
           'wholesale_interchange',
+
         brand:
           null,
+
         frequency:
           'statement_detail',
+
         negotiable:
           false,
+
         published:
           null,
+
         ruleId:
           'CC-FT-0001',
+
         classificationConfidence:
           0.95,
+
         classificationEvidence: [
           'commerce_control_fee_row',
           `commerce_control_category:${commerceControlCategory}`
         ],
+
         processor,
+
         status:
           'classified'
       };
