@@ -84,25 +84,32 @@ assert.equal(
 
 assert.equal(
   result.feeSummary.classified,
-  89,
-  '89 economically identified rows are classified'
+  90,
+  'all 90 economically identified rows are classified'
 );
 
 assert.equal(
   result.unknownFees.length,
-  1,
-  'only the malformed row remains unknown'
+  0,
+  'no Commerce Control fee rows remain unknown'
 );
 
-assert.equal(
-  result.unknownFees[0].originalDescription,
-  '1 TRANSACTIONS AT'
+const starTokenFee =
+  result.feeCandidates.find(
+    fee =>
+      fee.standardName ===
+        'STAR Token Exchange Debit Fee'
+  );
+
+assert.ok(
+  starTokenFee,
+  'STAR token fee is recovered and classified by name'
 );
 
-assert.equal(
-  result.unknownFees[0].amount,
-  0.01
-);
+assert.equal(starTokenFee.amount, 0.01);
+assert.equal(starTokenFee.category, 'assessment');
+assert.equal(starTokenFee.bucket, 'network');
+assert.equal(starTokenFee.ruleId, 'CC-FT-1008');
 
 assert.equal(
   result.feeSummary.reconciliationEligibleCents,
@@ -114,13 +121,13 @@ const expectedBuckets = {
   wholesale_interchange:
     1308.59,
   network:
-    105.19,
+    105.20,
   processor_revenue:
     52.83,
   third_party:
     34.95,
   unknown:
-    0.01
+    0
 };
 
 assert.deepEqual(
@@ -133,7 +140,8 @@ for (
   const description of
   [
     'MASTERCARD SALES DISCOUNT 0.0005 DISC RATE TIMES $7472.92',
-    'MC AUTH CONNECTIVITY FEE 28 KILOBYTES AT 0.002294'
+    'MC AUTH CONNECTIVITY FEE 28 KILOBYTES AT 0.002294',
+    'STAR TOKEN EXCHANGE DEBIT FEE'
   ]
 ) {
   const outsideCommerceControl =
