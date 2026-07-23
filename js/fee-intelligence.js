@@ -138,6 +138,14 @@ export function classifyFeeCandidate(
     const fee of
     FEE_REGISTRY
   ) {
+    if (
+      fee.processorScope &&
+      fee.processorScope !==
+        processor
+    ) {
+      continue;
+    }
+
     let score =
       0;
 
