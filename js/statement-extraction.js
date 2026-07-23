@@ -300,7 +300,7 @@ if(useCommerceControlInterchangeParser){
   // Lines that belong to a formula / value column and can never be a fee's
   // description head (rates, volumes, counts, percentages, connector words).
   const continuationValuePattern=/^(?:\$?-?[\d,]+\.?\d*%?|\.\d+)$/;
-  const formulaConnectorPattern=/^(?:times|at|disc(?:ount)?(?:\s+rate)?|kilobytes?|per|trns|transactions?)$/i;
+  const formulaConnectorPattern=/^(?:times|at|disc(?:ount)?(?:\s+rate)?|kilobytes?|per|trns|transactions?|\d+\s+(?:transactions?|trns)\s+at)$/i;
 
   // A "description" that is really a summary / overview label is not a fee.
   const summaryHeadPattern=/\b(?:adjustments?|chargebacks?|reversals?|retrievals?|disputes?|totals?|sub[\s-]?total|amount\s+(?:submitted|processed)|deposits?|fundings?|summary|overview)\b/i;
