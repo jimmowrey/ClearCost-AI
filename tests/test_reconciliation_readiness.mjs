@@ -290,4 +290,45 @@ assert.equal(RECONCILIATION_TOLERANCE, 0.01);
     'ACC1: fee must reconcile when custom tolerance with full provenance covers the variance');
 }
 
+// ── Complete statement evidence unlocks overall reconciliation ──────────────
+{
+  const result = assessReconciliation({
+    extractedFeeTotal: 1501.57,
+    statementFeeTotal: 1501.57,
+    statementTransactionCount: 319,
+    statementVolume: 82750.01
+  });
+
+  assert.equal(result.feeReconciliationStatus, RECONCILIATION_STATUS.FEE_RECONCILED);
+  assert.equal(result.volumeReconciliationStatus, RECONCILIATION_STATUS.RECONCILED);
+  assert.equal(result.transactionCountReconciliationStatus, RECONCILIATION_STATUS.RECONCILED);
+  assert.equal(result.overallReconciliationStatus, RECONCILIATION_STATUS.RECONCILED);
+  assert.equal(result.status, RECONCILIATION_STATUS.RECONCILED);
+  assert.equal(result.proposalBlocked, false);
+  assert.equal(result.blockReason, null);
+  assert.equal(result.volumeVariance, null, 'No independent volume comparison is invented');
+  assert.equal(result.transactionCountVariance, null, 'No independent count comparison is invented');
+}
+
+// ── Either missing statement metric continues to block proposals ─────────────
+{
+  const missingVolume = assessReconciliation({
+    extractedFeeTotal: 1501.57,
+    statementFeeTotal: 1501.57,
+    statementTransactionCount: 319
+  });
+  assert.equal(missingVolume.overallReconciliationStatus, RECONCILIATION_STATUS.PARTIALLY);
+  assert.equal(missingVolume.proposalBlocked, true);
+  assert.ok(missingVolume.blockReason.includes('volume'));
+
+  const missingCount = assessReconciliation({
+    extractedFeeTotal: 1501.57,
+    statementFeeTotal: 1501.57,
+    statementVolume: 82750.01
+  });
+  assert.equal(missingCount.overallReconciliationStatus, RECONCILIATION_STATUS.PARTIALLY);
+  assert.equal(missingCount.proposalBlocked, true);
+  assert.ok(missingCount.blockReason.includes('transaction count'));
+}
+
 console.log('Sprint 5.0 reconciliation readiness regression tests passed.');
