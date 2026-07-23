@@ -221,8 +221,19 @@ const result = await runStatementIntelligencePipeline(
     needsReview,
     'unknown-fee queue length matches the needs-review count'
   );
-  // Every extracted fee is preserved (none discarded) and none is hidden.
-  assert.ok(unknownQueued >= 0 && unknownQueued <= feesFound);
+  // Every extracted fee is preserved and classified. The STAR token row is
+  // split across four PDF text items; its formula fragment must not replace
+  // the actual fee description.
+  assert.equal(classified, 90, 'all 90 Commerce Control fee rows are classified');
+  assert.equal(needsReview, 0, 'no Commerce Control fee row remains unresolved');
+  assert.equal(unknownQueued, 0, 'unknown-fee queue is empty');
+
+  const starTokenFee = result.feeCandidates.find(
+    fee => fee.originalDescription === 'STAR TOKEN EXCHANGE DEBIT FEE'
+  );
+  assert.ok(starTokenFee, 'split STAR token fee description is recovered');
+  assert.equal(starTokenFee.amount, 0.01);
+  assert.equal(starTokenFee.status, 'classified');
 }
 
 console.log('North State Power Sports Commerce Control real-statement reconciliation regression tests passed.');
