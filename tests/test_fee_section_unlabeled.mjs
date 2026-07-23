@@ -64,11 +64,14 @@ const rec = text => ({ name: 'stmt.pdf', pageCount: 1, pages: [{ index: 1, text 
   assert.deepEqual(descs, ['Merchant Advantage Plus'], 'only the real keyword-less fee is captured');
 }
 
-// ── 3. No change to Commerce Control reconciliation ($909.75) behavior ───────
+// ── 3. Reconciliation-eligible exclusion is scoped by extraction method ──────
+// Synthetic candidates (not a real statement). The $909.75 below is an
+// illustrative arithmetic total, NOT the North State Power Sports statement
+// total (that real statement reconciles to $1,501.57).
 {
-  // The reconciliation exclusion set is scoped to the Commerce Control
-  // interchange method only. An unlabeled single-line fee is reconciliation
-  // ELIGIBLE; a commerce_control interchange row is NOT.
+  // The reconciliation exclusion set is scoped by extraction method. An
+  // unlabeled single-line fee is reconciliation ELIGIBLE; a row tagged with the
+  // excluded commerce_control_interchange_table_row method is NOT.
   const fees = [
     { amount: 500.00,  status: 'classified',   extractionMethod: 'single_line_fee' },
     { amount: 250.00,  status: 'needs_review', extractionMethod: 'single_line_fee_unlabeled' },
@@ -77,7 +80,7 @@ const rec = text => ({ name: 'stmt.pdf', pageCount: 1, pages: [{ index: 1, text 
     { amount: -88.25,  status: 'unclassified', extractionMethod: 'commerce_control_interchange_table_row' },
   ];
   const s = summarizeFees(fees);
-  // 500 + 250 + 159.75 = 909.75 (the two commerce_control rows excluded)
+  // 500 + 250 + 159.75 = 909.75 (the two excluded-method rows excluded)
   assert.equal(s.reconciliationEligibleCents, 90975);
   assert.equal(s.reconciliationEligibleTotal, 909.75);
 

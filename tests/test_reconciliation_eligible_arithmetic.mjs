@@ -12,31 +12,39 @@ import {
 } from '../js/reconciliation-readiness.js';
 
 // ─────────────────────────────────────────────────────────────────────────────
-// North State Power Sports — Commerce Control statement reconciliation.
+// SYNTHETIC reconciliation-eligible arithmetic unit test.
 //
-// Confirmed statement total fees: $909.75.
+// This test uses HAND-BUILT fee candidates — it does NOT parse any statement
+// and is not tied to any real merchant. It exercises the generic
+// reconciliation-eligible mechanism in js/fee-intelligence.js
+// (RECONCILIATION_EXCLUDED_EXTRACTION_METHODS / isReconciliationEligible /
+// computeReconciliationEligible*) and the integer-cent reconciliation
+// arithmetic in js/reconciliation-readiness.js.
 //
-// Commerce Control interchange/program detail rows (pages 6–7) are preserved as
-// fee candidates for analysis, but they are ALSO represented in the statement
-// fee section. They must not be counted twice during reconciliation.
+// The $909.75 figure below is an ILLUSTRATIVE synthetic total used to drive the
+// arithmetic. It is NOT the North State Power Sports statement total — that real
+// statement reconciles to $1,501.57 (see
+// tests/test_commerce_control_north_state_reconciliation.mjs). The
+// `commerce_control_interchange_table_row` exclusion method modelled here is no
+// longer produced by live Commerce Control extraction; this test retains
+// coverage of the exclusion mechanism itself as generic infrastructure.
 //
-// Regression contract:
-//   1. Commerce Control detail rows remain preserved among fee candidates.
+// Contract:
+//   1. Rows tagged with an excluded method remain preserved among candidates.
 //   2. They are excluded ONLY from the reconciliation-eligible total.
-//   3. Other processors' interchange detail is unaffected (still eligible).
-//   4. Reconciliation reconciles exactly to $909.75.
+//   3. Rows using any other extraction method stay reconciliation-eligible.
+//   4. The reconciliation arithmetic reconciles the eligible total exactly.
 // ─────────────────────────────────────────────────────────────────────────────
 
-// Statement fee-section candidates that make up the printed $909.75 total.
+// Synthetic fee-section candidates that make up the illustrative $909.75 total.
 const statementSectionFees = [
   { amount: 500.00, status: 'classified', extractionMethod: 'statement_fee_section' },
   { amount: 250.00, status: 'classified', extractionMethod: 'statement_fee_section' },
   { amount: 159.75, status: 'classified', extractionMethod: 'statement_fee_section' }
 ];
 
-// Commerce Control interchange detail rows (pages 6–7). These duplicate the
-// fee-section content and carry per-line interchange provenance. In extraction
-// they are emitted with negative amounts (amount: -printedCharge).
+// Synthetic detail rows tagged with the excluded extraction method, carrying
+// per-line provenance. Emitted with negative amounts (amount: -printedCharge).
 const commerceControlDetailRows = [
   {
     amount: -120.50,
@@ -119,7 +127,7 @@ const feeCandidates = [...statementSectionFees, ...commerceControlDetailRows];
   assert.equal(summary.reconciliationEligibleTotal, 909.75);
 }
 
-// ── 4. Reconciliation reconciles exactly to $909.75 ──────────────────────────
+// ── 4. Reconciliation reconciles exactly to the illustrative eligible total ──
 {
   const summary = summarizeFees(feeCandidates);
 
@@ -145,4 +153,4 @@ const feeCandidates = [...statementSectionFees, ...commerceControlDetailRows];
   assert.notEqual(naive.feeReconciliationStatus, RECONCILIATION_STATUS.FEE_RECONCILED);
 }
 
-console.log('North State Power Sports Commerce Control reconciliation regression tests passed.');
+console.log('Synthetic reconciliation-eligible arithmetic unit tests passed.');

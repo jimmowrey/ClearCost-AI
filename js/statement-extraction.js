@@ -106,8 +106,6 @@ export async function detectProcessor(text='',options={}){
 export function extractFeeCandidates(sections=[],options={}){
   const processorId=options.processorId||null;
   const rulePackId=options.rulePackId||null;
-    console.log('FEE EXTRACTION SECTIONS:', sections);
-    console.log('INTERCHANGE SECTIONS:', sections.filter(s => s.type === SECTION_TYPES.INTERCHANGE));
   const feeTypes=new Set([
     SECTION_TYPES.INTERCHANGE,
     SECTION_TYPES.ASSESSMENTS,
@@ -257,90 +255,156 @@ export function extractFeeCandidates(sections=[],options={}){
 }
 
 if(useCommerceControlInterchangeParser){
-  for(const section of sections.filter(
-    s=>s.type===SECTION_TYPES.INTERCHANGE
-  )){
-    const lines=section.lines.map(clean);
+  /*
+   * ============================================================
+   * COMMERCE CONTROL FEE ROW EXTRACTION
+   * ============================================================
+   *
+   * Commerce Control statements (e.g. North State Power Sports) render every
+   * charged fee as a three-part row in the extracted PDF text layer:
+   *
+   *   <description>        e.g. "MC-WORLD ELITE MERIT I"
+   *   <category label>     one of: Interchange charges | Service charges |
+   *                        Fees | Program Fees
+   *   <signed amount>      e.g. "-$56.38" (a charge) or "$2.42" (a credit)
+   *
+   * The description may span several preceding lines when the row is a formula
+   * (e.g. "VI-COMMERCIAL SOLUTIONS FEE" / ".000100" / "TIMES" / "$10,449.65").
+   * The charged amount ALWAYS sits immediately after the category label, so we
+   * anchor on the category label and reconstruct the description by walking
+   * backwards over numeric / formula continuation lines to the first real
+   * descriptor.
+   *
+   * Summary / overview rows are rejected. The statement's component and grand
+   * totals are printed as "Total ...", "TOTAL", etc. — those are not exact
+   * category labels, so they never anchor. The one overview row that does
+   * anchor (the account-overview box prints the grand total as
+   * "Fees / -$1,501.57") resolves its description head to a summary label
+   * (e.g. "Adjustments") and is filtered out.
+   *
+   * Signs: a charge (printed "-$X") is normalised to a POSITIVE merchant cost;
+   * a credit (printed "$X") to a NEGATIVE cost. The net of every extracted row
+   * therefore reproduces the printed statement fee total exactly. These rows
+   * are ordinary reconciliation-eligible fees: interchange / program charges
+   * are a real component of the merchant's fee total, not a duplicate.
+   */
+  const categoryByLabel={
+    'interchange charges':'interchange',
+    'service charges':'service',
+    'fees':'fees',
+    'program fees':'program'
+  };
 
-    for(let index=0;index<=lines.length-8;index++){
-      const description=lines[index];
-      const volumeLine=lines[index+1];
-      const salesPercentLine=lines[index+2];
-      const transactionCountLine=lines[index+3];
-      const transactionPercentLine=lines[index+4];
-      const percentRateLine=lines[index+5];
-      const perTransactionRateLine=lines[index+6];
-      const chargeLine=lines[index+7];
+  const signedAmountPattern=/^(-?)\$?(\d{1,3}(?:,\d{3})*\.\d{2})(-?)$/;
 
-      const volumeMatch=volumeLine.match(/^\$([\d,]+\.\d{2})$/);
-      const chargeMatch=chargeLine.match(/^(-?)\$?([\d,]+\.\d{2})$/);
-const isTotalRow=/\bTOTAL\b/i.test(description);
-      const isDetailRow=
-        description &&
-        !isTotalRow &&
-        volumeMatch &&
-        /^\d+(?:\.\d+)?%$/.test(salesPercentLine) &&
-        /^\d+$/.test(transactionCountLine) &&
-        /^\d+(?:\.\d+)?%$/.test(transactionPercentLine) &&
-        /^\d*\.?\d+$/.test(percentRateLine) &&
-        /^\$?\d*\.?\d{3}$/.test(perTransactionRateLine) &&
-        chargeMatch;
+  // Lines that belong to a formula / value column and can never be a fee's
+  // description head (rates, volumes, counts, percentages, connector words).
+  const continuationValuePattern=/^(?:\$?-?[\d,]+\.?\d*%?|\.\d+)$/;
+  const formulaConnectorPattern=/^(?:times|at|disc(?:ount)?(?:\s+rate)?|kilobytes?|per|trns|transactions?)$/i;
 
-      if(!isDetailRow) continue;
+  // A "description" that is really a summary / overview label is not a fee.
+  const summaryHeadPattern=/\b(?:adjustments?|chargebacks?|reversals?|retrievals?|disputes?|totals?|sub[\s-]?total|amount\s+(?:submitted|processed)|deposits?|fundings?|summary|overview)\b/i;
 
-      const volume=Number(
-        volumeMatch[1].replace(/,/g,'')
-      );
+  const isContinuationLine=value=>{
+    const trimmed=String(value).trim();
+    const compact=trimmed.replace(/\s/g,'');
+    return (
+      !trimmed ||
+      continuationValuePattern.test(compact) ||
+      signedAmountPattern.test(compact) ||
+      formulaConnectorPattern.test(trimmed) ||
+      !/[A-Za-z]/.test(trimmed)
+    );
+  };
 
-      const printedCharge=
-        (chargeMatch[1]==='-' ? -1 : 1) *
-        Number(chargeMatch[2].replace(/,/g,''));
+  // Reconstruct a row's description by walking backwards over continuation
+  // lines to the first line that carries a real descriptor.
+  const reconstructDescription=(lines,anchorIndex)=>{
+    let cursor=anchorIndex-1;
+    while(cursor>=0 && isContinuationLine(lines[cursor])) cursor--;
+    return cursor>=0 ? clean(lines[cursor]) : '';
+  };
 
-     console.log(
-  'COMMERCE CONTROL IC ROW:',
-  {
-    description,
-    volume,
-    printedCharge,
-    feeAmount:-printedCharge,
-    page:section.page
-  }
-);
-
-if(printedCharge>0){
-  console.log(
-    'COMMERCE CONTROL IC CREDIT:',
-    {
-      description,
-      printedCharge,
-      feeAmount:-printedCharge,
-      page:section.page
+  /*
+   * Group every section's lines by page, preserving document order, so a fee
+   * row whose description and category label were split across adjacent
+   * segmented sections is scanned as one continuous per-page stream.
+   */
+  const linesByPage=new Map();
+  for(const section of sections){
+    if(!linesByPage.has(section.page)) linesByPage.set(section.page,[]);
+    const bucket=linesByPage.get(section.page);
+    for(const raw of section.lines){
+      bucket.push({text:clean(raw),section:section.type});
     }
-  );
-}
+  }
 
-candidates.push({
-        amount:-printedCharge,
-        page:section.page,
-        line:section.startLine+index,
-        section:section.type,
-        rawText:lines.slice(index,index+8).join(' '),
+  for(const [page,entries] of linesByPage){
+    const lines=entries.map(entry=>entry.text);
+
+    for(let index=0;index<lines.length-1;index++){
+      const category=categoryByLabel[lines[index].toLowerCase()];
+
+      if(!category) continue;
+
+      const amountMatch=lines[index+1]
+        .replace(/\s/g,'')
+        .match(signedAmountPattern);
+
+      if(!amountMatch) continue;
+
+      const printedNegative=amountMatch[1]==='-'||amountMatch[3]==='-';
+      const magnitude=Number(amountMatch[2].replace(/,/g,''));
+
+      // Charge => positive cost; credit => negative cost.
+      const amount=printedNegative ? magnitude : -magnitude;
+
+      const description=reconstructDescription(lines,index);
+
+      // Reject summary / overview rows and any row without a real descriptor.
+      if(
+        !description ||
+        categoryByLabel[description.toLowerCase()] ||
+        summaryHeadPattern.test(description)
+      ){
+        continue;
+      }
+
+      const isInterchange=category==='interchange'||category==='program';
+
+      candidates.push({
+        originalDescription:description,
+        amount,
+        page,
+        line:index+1,
+        section:isInterchange
+          ? SECTION_TYPES.INTERCHANGE
+          : entries[index].section,
+        rawText:[description,lines[index],lines[index+1]].join(' '),
         confidence:.99,
         status:'unclassified',
-        extractionMethod:'commerce_control_interchange_table_row',
-        interchangeDetails:{
-          description,
-          volume,
-          transactionCount:Number(transactionCountLine),
-          percentRate:Number(percentRateLine),
-          perTransactionRate:Number(
-            perTransactionRateLine.replace('$','')
-          ),
-          interchangeCharge:-printedCharge
-        }
+        extractionMethod:'commerce_control_fee_row',
+        commerceControlCategory:category,
+
+        /*
+         * Preserve interchange / program provenance for analysis. Volume,
+         * transaction count, and rate remain null unless explicitly present;
+         * they are never estimated.
+         */
+        interchangeDetails:isInterchange
+          ? {
+              description,
+              category,
+              volume:null,
+              transactionCount:null,
+              percentRate:null,
+              perTransactionRate:null,
+              interchangeCharge:amount
+            }
+          : undefined
       });
 
-      index+=7;
+      index+=1; // consume the amount line
     }
   }
 }
@@ -348,8 +412,15 @@ candidates.push({
    * ============================================================
    * NON-INTERCHANGE FEE EXTRACTION
    * ============================================================
+   *
+   * Runs for every processor EXCEPT Commerce Control. Commerce Control fee
+   * rows (across all categories, including service charges and fees) are
+   * handled by the dedicated fee-row parser above, so this generic
+   * description-and-amount pass is skipped for Commerce Control to avoid
+   * capturing its summary / value columns as spurious fees.
    */
 
+  if(!useCommerceControlInterchangeParser){
   for(const section of sections.filter(
     s=>feeTypes.has(s.type) &&
        s.type!==SECTION_TYPES.INTERCHANGE
@@ -776,6 +847,7 @@ candidates.push({
               : null
       });
     }
+  }
   }
 
   return candidates;
