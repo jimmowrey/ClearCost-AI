@@ -56,4 +56,28 @@ const empty = Extraction.extractionResult("No pricing rows are present.");
 assert.equal(empty.status, "needs_review");
 assert.equal(empty.terms.length, 0);
 
+{
+  const namedWorker = () => "named";
+  assert.equal(
+    Extraction.resolveCreateWorker({ createWorker: namedWorker }),
+    namedWorker,
+    "named Tesseract exports remain supported"
+  );
+
+  const defaultWorker = () => "default";
+  assert.equal(
+    Extraction.resolveCreateWorker({
+      default: { createWorker: defaultWorker },
+    }),
+    defaultWorker,
+    "Tesseract v5 ESM default exports are supported"
+  );
+
+  assert.throws(
+    () => Extraction.resolveCreateWorker({ default: {} }),
+    /OCR engine did not load correctly/,
+    "invalid CDN module shapes fail with an actionable error"
+  );
+}
+
 console.log("Schedule A extraction regression tests passed.");

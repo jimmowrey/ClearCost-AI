@@ -128,8 +128,18 @@
     });
   }
 
+  function resolveCreateWorker(moduleNamespace) {
+    const createWorker = moduleNamespace?.createWorker
+      || moduleNamespace?.default?.createWorker;
+    if (typeof createWorker !== "function") {
+      throw new Error("Schedule A OCR engine did not load correctly.");
+    }
+    return createWorker;
+  }
+
   global.ClearCostScheduleAExtraction = Object.freeze({
     extractTerms,
     extractionResult,
+    resolveCreateWorker,
   });
 })(typeof window !== "undefined" ? window : globalThis);
