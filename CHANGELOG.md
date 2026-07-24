@@ -26,6 +26,9 @@ under `Unreleased` until a versioning scheme is adopted (see `docs/Roadmap.md`).
   than the raw fee summary total.
 
 ### Fixed
+- Schedule A OCR now retries split-only results with a higher-resolution sparse
+  table scan. Split-only extraction is marked incomplete and cannot be saved or
+  verified, and versioned script URLs prevent stale browser code after deploy.
 - Commerce Control live-statement fee extraction. On the real North State Power
   Sports statement the extractor mis-parsed the text layer: it produced ~110 fee
   candidates and a reconciliation-eligible total of ~$9,852 (interchange/program
