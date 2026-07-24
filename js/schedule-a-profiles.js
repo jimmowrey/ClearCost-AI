@@ -140,6 +140,11 @@
         const profiles = load();
         const index = profiles.findIndex(item => item.id === profileId);
         if (index < 0) throw new Error("Schedule A version was not found.");
+        if (extraction?.status !== "extracted") {
+          throw new Error(
+            "Incomplete Schedule A extraction cannot be saved for verification."
+          );
+        }
         const terms = Array.isArray(extraction?.terms) ? extraction.terms : [];
         if (!terms.length) throw new Error("No Schedule A terms were extracted.");
         profiles[index] = normalizeProfile({

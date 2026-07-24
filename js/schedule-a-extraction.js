@@ -120,10 +120,21 @@
 
   function extractionResult(rawText, source = "pdf_text") {
     const terms = extractTerms(rawText);
+    const costTerms = terms.filter(term => term.scope !== "compensation");
+    const splitOnly = terms.some(term => term.id === "income_split")
+      && costTerms.length === 0;
+    const status = !terms.length
+      ? "needs_review"
+      : splitOnly
+        ? "incomplete"
+        : "extracted";
     return Object.freeze({
-      status: terms.length ? "extracted" : "needs_review",
+      status,
       source,
       terms,
+      completenessReason: splitOnly
+        ? "The compensation split was found, but no Schedule A cost rows were extracted."
+        : "",
       extractedAt: new Date().toISOString(),
     });
   }

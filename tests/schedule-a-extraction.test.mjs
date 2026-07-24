@@ -56,6 +56,14 @@ const empty = Extraction.extractionResult("No pricing rows are present.");
 assert.equal(empty.status, "needs_review");
 assert.equal(empty.terms.length, 0);
 
+const splitOnly = Extraction.extractionResult(
+  "Income over this cost will be split 80% to ISC and 20% to SignaPay.",
+  "ocr"
+);
+assert.equal(splitOnly.status, "incomplete");
+assert.equal(splitOnly.terms.length, 1);
+assert.match(splitOnly.completenessReason, /no Schedule A cost rows/i);
+
 {
   const namedWorker = () => "named";
   assert.equal(
