@@ -16,7 +16,7 @@
     ["batch_header", "Batch header", "general", /Batch Header/i],
     ["voice_authorization", "Voice authorization inquiry", "general", /Voice Authorization Inquiry/i],
     ["avs", "AVS", "general", /\bAVS\b/i],
-    ["monthly_minimum", "Monthly minimum", "general", /Monthly Minimum/i],
+    ["monthly_minimum", "Monthly minimum", "general", /Monthly Minimu(?:m|rn)/i],
     ["cancellation_fee", "Cancellation fee", "general", /Cancellation Fee/i],
     ["amex_optblue_sponsor", "Amex OptBlue sponsor cost", "general", /Amex OptBlue Sponsor Cost/i],
     ["micros_authorization_capture", "Micros authorization / capture", "general", /Micros Authorization\/Capture/i],
