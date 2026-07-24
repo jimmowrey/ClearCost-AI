@@ -77,6 +77,27 @@ assert.equal(profile.terms.length, 0);
   });
   assert.equal(extracted.extractionStatus, "extracted");
   assert.equal(extracted.termsVerified, false);
+  const reextracted = registry.saveExtraction(profile.id, {
+    status: "extracted",
+    terms: [{
+      id: "income_split",
+      label: "Income split",
+      value: "80% agent / 20% SignaPay",
+      verified: false,
+    }, {
+      id: "authorization",
+      label: "Authorization",
+      value: "$0.04/item",
+      verified: false,
+    }],
+  });
+  assert.equal(reextracted.terms.length, 2);
+  assert.equal(reextracted.termsVerified, false);
+  assert.equal(
+    reextracted.documentFingerprint,
+    extracted.documentFingerprint,
+    "re-extraction replaces derived terms without replacing the source PDF version"
+  );
   assert.throws(
     () => registry.saveExtraction(second.id, {
       status: "incomplete",
@@ -91,19 +112,19 @@ assert.equal(profile.terms.length, 0);
     "partial OCR results cannot enter the verification workflow"
   );
   assert.throws(
-    () => registry.verifyTerms(profile.id, extracted.terms, new Date(), true),
+    () => registry.verifyTerms(profile.id, reextracted.terms, new Date(), true),
     /verify every extracted term/i
   );
   assert.throws(
     () => registry.verifyTerms(
       profile.id,
-      extracted.terms.map(term => ({ ...term, verified: true }))
+      reextracted.terms.map(term => ({ ...term, verified: true }))
     ),
     /every Schedule A row/i
   );
   const verified = registry.verifyTerms(
     profile.id,
-    extracted.terms.map(term => ({ ...term, verified: true })),
+    reextracted.terms.map(term => ({ ...term, verified: true })),
     new Date("2026-07-23T13:00:00Z"),
     true
   );
