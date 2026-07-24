@@ -1955,22 +1955,36 @@ async function scheduleAPdfText(pdfBlob, status) {
       }
     }
   });
-  const pageTexts = [];
-  try {
+  async function recognizePages(scale) {
+    const texts = [];
     for (const record of pageRecords) {
-      const viewport = record.page.getViewport({ scale: 2 });
+      const viewport = record.page.getViewport({ scale });
       const canvas = document.createElement('canvas');
       canvas.width = Math.ceil(viewport.width);
       canvas.height = Math.ceil(viewport.height);
+      const canvasContext = canvas.getContext('2d');
+      canvasContext.fillStyle = '#ffffff';
+      canvasContext.fillRect(0, 0, canvas.width, canvas.height);
       await record.page.render({
-        canvasContext: canvas.getContext('2d'),
-        viewport
+        canvasContext,
+        viewport,
+        background: '#ffffff'
       }).promise;
       const result = await worker.recognize(canvas);
-      pageTexts.push(result.data.text || '');
+      texts.push(result.data.text || '');
     }
+    return texts.join('\n');
+  }
 
-    const firstPassText = pageTexts.join('\n');
+  try {
+    // Ruled Schedule A tables must be rendered onto an opaque white canvas.
+    // A transparent PDF canvas caused Tesseract to recognize the heading and
+    // compensation split while silently dropping every row in the table.
+    await worker.setParameters({
+      tessedit_pageseg_mode: '3',
+      preserve_interword_spaces: '1'
+    });
+    const firstPassText = await recognizePages(2);
     const firstPass = window.ClearCostScheduleAExtraction.extractionResult(
       firstPassText,
       'ocr'
@@ -1982,31 +1996,30 @@ async function scheduleAPdfText(pdfBlob, status) {
     if (status) {
       status.innerHTML =
         `<div class="notice warning"><strong>Checking incomplete OCR</strong>` +
-        `<p>The first pass missed pricing rows. Running a higher-resolution table scan.</p></div>`;
+        `<p>The first pass missed pricing rows. Running a higher-resolution automatic-layout scan.</p></div>`;
     }
+    const automaticRetryText = await recognizePages(3);
+    const automaticRetry = window.ClearCostScheduleAExtraction.extractionResult(
+      `${firstPassText}\n${automaticRetryText}`,
+      'ocr_retry'
+    );
+    if (automaticRetry.status !== 'incomplete') {
+      return {
+        text: `${firstPassText}\n${automaticRetryText}`,
+        source: 'ocr_retry'
+      };
+    }
+
+    // Sparse-text recognition remains a final fallback for unusual schedules.
+    // It is not the primary retry because it can discard ruled table rows.
     await worker.setParameters({
       tessedit_pageseg_mode: '11',
       preserve_interword_spaces: '1'
     });
-    const retryTexts = [];
-    for (const record of pageRecords) {
-      const viewport = record.page.getViewport({ scale: 3 });
-      const canvas = document.createElement('canvas');
-      canvas.width = Math.ceil(viewport.width);
-      canvas.height = Math.ceil(viewport.height);
-      const canvasContext = canvas.getContext('2d');
-      canvasContext.fillStyle = '#ffffff';
-      canvasContext.fillRect(0, 0, canvas.width, canvas.height);
-      await record.page.render({
-        canvasContext,
-        viewport
-      }).promise;
-      const result = await worker.recognize(canvas);
-      retryTexts.push(result.data.text || '');
-    }
+    const sparseRetryText = await recognizePages(3);
     return {
-      text: `${firstPassText}\n${retryTexts.join('\n')}`,
-      source: 'ocr_retry'
+      text: `${firstPassText}\n${automaticRetryText}\n${sparseRetryText}`,
+      source: 'ocr_multi_pass'
     };
   } finally {
     await worker.terminate();

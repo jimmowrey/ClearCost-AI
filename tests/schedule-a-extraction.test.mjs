@@ -52,6 +52,18 @@ assert.equal(
 assert.equal(byId.get("after_hours_help_desk").value, "$5.75");
 assert.ok(Array.from(terms).every(term => term.verified === false));
 
+const actualScanOcr = readFileSync(
+  new URL("./fixtures/signapay-schedule-a-actual-ocr.txt", import.meta.url),
+  "utf8"
+);
+const actualScanResult = Extraction.extractionResult(actualScanOcr, "ocr");
+assert.equal(
+  actualScanResult.terms.length,
+  28,
+  "the actual SignaPay scan must produce 27 cost rows plus its compensation split"
+);
+assert.equal(actualScanResult.status, "extracted");
+
 const empty = Extraction.extractionResult("No pricing rows are present.");
 assert.equal(empty.status, "needs_review");
 assert.equal(empty.terms.length, 0);
