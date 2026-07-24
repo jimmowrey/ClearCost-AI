@@ -1904,9 +1904,15 @@ function renderScheduleAProfiles() {
           : 'Extraction pending'} · ` +
         `${profile.termsVerified ? 'Terms verified' : 'Terms not verified'}</small>` +
         `<button class="secondary full-width schedule-a-action" type="button" ` +
+        `data-schedule-action="${profile.extractionStatus === 'extracted' ? 'review' : 'extract'}" ` +
         `data-profile-id="${escapeHtml(profile.id)}">` +
         `${profile.extractionStatus === 'extracted' ? 'Review Terms' : 'Extract Terms'}` +
         `</button>` +
+        (profile.extractionStatus === 'extracted'
+          ? `<button class="secondary full-width schedule-a-action" type="button" ` +
+            `data-schedule-action="reextract" ` +
+            `data-profile-id="${escapeHtml(profile.id)}">Re-extract Terms</button>`
+          : '') +
         `</article>`
       ).join('')
     : '<div class="empty-state">No Schedule A versions uploaded.</div>';
@@ -2056,12 +2062,12 @@ function addMissingScheduleATerm() {
   );
 }
 
-async function extractScheduleATerms(profileId) {
+async function extractScheduleATerms(profileId, replaceExisting = false) {
   const status = $('scheduleAStatus');
   try {
     const profile = scheduleARegistry.load().find(item => item.id === profileId);
     if (!profile) throw new Error('Schedule A version was not found.');
-    if (profile.extractionStatus === 'extracted') {
+    if (profile.extractionStatus === 'extracted' && !replaceExisting) {
       renderScheduleAReview(profile);
       return;
     }
@@ -2806,7 +2812,11 @@ if (uploadScheduleAButton) {
 if ($('scheduleAList')) {
   $('scheduleAList').onclick = event => {
     const button = event.target.closest('.schedule-a-action');
-    if (button) extractScheduleATerms(button.dataset.profileId);
+    if (!button) return;
+    extractScheduleATerms(
+      button.dataset.profileId,
+      button.dataset.scheduleAction === 'reextract'
+    );
   };
 }
 
