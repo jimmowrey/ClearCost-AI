@@ -67,6 +67,7 @@ assert.equal(profile.terms.length, 0);
   );
 
   const extracted = registry.saveExtraction(profile.id, {
+    status: "extracted",
     terms: [{
       id: "authorization",
       label: "Authorization",
@@ -76,6 +77,19 @@ assert.equal(profile.terms.length, 0);
   });
   assert.equal(extracted.extractionStatus, "extracted");
   assert.equal(extracted.termsVerified, false);
+  assert.throws(
+    () => registry.saveExtraction(second.id, {
+      status: "incomplete",
+      terms: [{
+        id: "income_split",
+        label: "Income split",
+        value: "80% / 20%",
+        verified: false,
+      }],
+    }),
+    /incomplete Schedule A extraction/i,
+    "partial OCR results cannot enter the verification workflow"
+  );
   assert.throws(
     () => registry.verifyTerms(profile.id, extracted.terms, new Date(), true),
     /verify every extracted term/i
