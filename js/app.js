@@ -1963,10 +1963,48 @@ async function scheduleAPdfText(pdfBlob, status) {
       const result = await worker.recognize(canvas);
       pageTexts.push(result.data.text || '');
     }
+
+    const firstPassText = pageTexts.join('\n');
+    const firstPass = window.ClearCostScheduleAExtraction.extractionResult(
+      firstPassText,
+      'ocr'
+    );
+    if (firstPass.status !== 'incomplete') {
+      return { text: firstPassText, source: 'ocr' };
+    }
+
+    if (status) {
+      status.innerHTML =
+        `<div class="notice warning"><strong>Checking incomplete OCR</strong>` +
+        `<p>The first pass missed pricing rows. Running a higher-resolution table scan.</p></div>`;
+    }
+    await worker.setParameters({
+      tessedit_pageseg_mode: '11',
+      preserve_interword_spaces: '1'
+    });
+    const retryTexts = [];
+    for (const record of pageRecords) {
+      const viewport = record.page.getViewport({ scale: 3 });
+      const canvas = document.createElement('canvas');
+      canvas.width = Math.ceil(viewport.width);
+      canvas.height = Math.ceil(viewport.height);
+      const canvasContext = canvas.getContext('2d');
+      canvasContext.fillStyle = '#ffffff';
+      canvasContext.fillRect(0, 0, canvas.width, canvas.height);
+      await record.page.render({
+        canvasContext,
+        viewport
+      }).promise;
+      const result = await worker.recognize(canvas);
+      retryTexts.push(result.data.text || '');
+    }
+    return {
+      text: `${firstPassText}\n${retryTexts.join('\n')}`,
+      source: 'ocr_retry'
+    };
   } finally {
     await worker.terminate();
   }
-  return { text: pageTexts.join('\n'), source: 'ocr' };
 }
 
 function renderScheduleAReview(profile) {
@@ -2034,6 +2072,12 @@ async function extractScheduleATerms(profileId) {
       extractedText.text,
       extractedText.source
     );
+    if (extraction.status === 'incomplete') {
+      throw new Error(
+        extraction.completenessReason ||
+        'Schedule A extraction is incomplete. Pricing rows were not found.'
+      );
+    }
     if (!extraction.terms.length) {
       throw new Error('No pricing terms could be extracted. Manual review is required.');
     }
