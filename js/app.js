@@ -1934,8 +1934,11 @@ async function scheduleAPdfText(pdfBlob, status) {
       `<div class="notice warning"><strong>Scanned PDF detected</strong>` +
       `<p>Running OCR locally on this device. This can take a minute.</p></div>`;
   }
-  const { createWorker } = await import(
+  const tesseractModule = await import(
     'https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.esm.min.js'
+  );
+  const createWorker = ClearCostScheduleAExtraction.resolveCreateWorker(
+    tesseractModule
   );
   const worker = await createWorker('eng', 1, {
     logger(message) {
