@@ -64,6 +64,29 @@ assert.equal(
 );
 assert.equal(actualScanResult.status, "extracted");
 
+const collapsedProductionRows = actualScanOcr.replace(
+  "AVS $0.02\nMonthly Minimum",
+  "AVS $0.02 Monthly Minimurn"
+);
+const collapsedProductionResult = Extraction.extractionResult(
+  collapsedProductionRows,
+  "ocr"
+);
+const collapsedProductionById = new Map(
+  Array.from(collapsedProductionResult.terms, term => [term.id, term])
+);
+assert.equal(
+  collapsedProductionResult.terms.length,
+  28,
+  "OCR-collapsed AVS and Monthly Minimum rows must remain separate review items"
+);
+assert.equal(collapsedProductionById.get("avs").value, "$0.02");
+assert.equal(
+  collapsedProductionById.get("monthly_minimum").value,
+  "$5.00/month"
+);
+assert.equal(collapsedProductionResult.status, "extracted");
+
 const empty = Extraction.extractionResult("No pricing rows are present.");
 assert.equal(empty.status, "needs_review");
 assert.equal(empty.terms.length, 0);
