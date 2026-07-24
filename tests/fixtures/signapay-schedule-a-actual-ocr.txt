@@ -1,0 +1,49 @@
+EXHIBIT A
+PRICING SCHEDULE
+SignaPay will retain the following cost amounts for the services rendered under this Agreement. Income
+over and above this cost will be split 80 % to ISC and 20 % to SignaPay.
+
+ITEM
+ISC COST PER ITEM
+V/MC/Discover Interchange plus Dues & Asses.
+Pass-Thru
+Authorization/Capture/Settle
+$0.04 /item
+BIN Sponsorship Fee
+2.0 basis points (0.020%) on the gross processing sales dollar volume
+Liability/Risk Fee
+2.0 basis points (0.020%) on the gross processing sales dollar volume
+Merchant Account on File
+$2.00/per account per month
+Merchant Statement
+$2.00/statement per month
+Gov't Regulatory Program (billed to merchant at $2.95) $2.95
+Next Day Funding $5.00/month
+Annual Fee $5.00
+PIN Debit Transaction Fee $0.06
+EBT Authorization Fee $0.06
+Batch Header $0.03
+Voice Authorization Inquiry $0.98/attempt
+AVS $0.02
+Monthly Minimum (billed to merchant at $20.00) $5.00/month
+Cancellation Fee (billed to merchant at $495.00) $0.00
+Amex OptBlue Sponsor Cost 20.0 basis points (0.20%) on the gross AMEX sales dollar volume
+Micros Authorization/Capture $0.065/attempt
+PCI Non-Compliance Fee (billed to merchant at $49.95/monthly) $14.95/month
+PCI Program Fee (billed $9.95/monthly) $4.00
+
+Priority/First
+Data Specific Items
+ITEM
+ISC COST PER ITEM
+PCI Program Fee (billed to merchant at $99/year)
+$30.00
+Buypass Statement Fee
+$0.25
+Buypass Pre Auth Fee (Pay-at-the-Pump)
+$0.01 /occurence
+Buypass Down Services
+$1.00/full download, $0.50/partial, $0.50/table
+Missing Originals Fee $1.00/day
+Help Desk/Service Calls $3.00
+After-Hours Help Desk Calls $5.75

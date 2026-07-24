@@ -60,3 +60,6 @@ under `Unreleased` until a versioning scheme is adopted (see `docs/Roadmap.md`).
   sprint; it is documentation/infrastructure only.
 
 <!-- TODO: adopt a versioning scheme and begin tagging releases. -->
+- Schedule A OCR now renders scanned PDFs on an opaque white canvas and keeps
+  automatic page layout for the high-resolution retry so ruled cost tables are
+  not reduced to the compensation split alone.
