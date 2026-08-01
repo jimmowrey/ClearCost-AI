@@ -2040,8 +2040,11 @@ function updateScheduleAVerificationState() {
   const coverageConfirmed =
     $('confirmScheduleACoverage')?.checked === true;
 
-  saveButton.disabled =
-    !(everyTermVerified && coverageConfirmed);
+  saveButton.disabled = false;
+  saveButton.dataset.ready =
+    everyTermVerified && coverageConfirmed
+      ? 'true'
+      : 'false';
 }
 
 function renderScheduleAReview(profile) {
@@ -2073,7 +2076,7 @@ function renderScheduleAReview(profile) {
     `Add Missing Term</button>` +
     `<div class="settings-card"><label><input id="confirmScheduleACoverage" ` +
     `type="checkbox"> I confirm every row in the source Schedule A is represented</label></div>` +
-    `<button id="verifyScheduleATerms" class="primary full-width" type="button" disabled>` +
+    `<button id="verifyScheduleATerms" class="primary full-width" type="button">` +
     `Save Verified Terms</button>`;
   const termContainer = review.querySelector('[data-review-profile]');
   $('markAllScheduleATerms').onclick = () => {
@@ -2181,11 +2184,21 @@ function verifyScheduleATerms(profileId) {
     if (terms.some(term => !term.label || !term.value)) {
       throw new Error('Every term must have a name and value.');
     }
+    const everyTermVerified =
+      terms.length > 0 &&
+      terms.every(term => term.verified);
+    const coverageConfirmed =
+      $('confirmScheduleACoverage')?.checked === true;
+    if (!everyTermVerified || !coverageConfirmed) {
+      throw new Error(
+        'Verify every term and confirm every source row is represented before saving.'
+      );
+    }
     const verified = scheduleARegistry.verifyTerms(
       profileId,
       terms,
       new Date(),
-      $('confirmScheduleACoverage')?.checked === true
+      coverageConfirmed
     );
     renderScheduleAProfiles();
     renderScheduleAReview(verified);
