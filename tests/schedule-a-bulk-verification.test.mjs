@@ -32,8 +32,14 @@ assert.match(
 
 assert.match(
   source,
-  /saveButton\.disabled\s*=\s*!\(everyTermVerified && coverageConfirmed\)/,
-  'Save Verified Terms must enable only after both safeguards pass'
+  /saveButton\.disabled\s*=\s*false/,
+  'Save Verified Terms must remain clickable even if browser-restored checkbox state is stale'
+);
+
+assert.match(
+  source,
+  /if \(!everyTermVerified \|\| !coverageConfirmed\)[\s\S]*Verify every term and confirm every source row is represented before saving/,
+  'the save handler itself must enforce both verification safeguards'
 );
 
 console.log('Schedule A bulk verification regression tests passed.');
