@@ -70,6 +70,13 @@
     return clean(money[money.length - 1][0]).replace(/\$\s+/, "$");
   }
 
+  function normalizeTermValue(definitionId, value) {
+    if (definitionId === "authorization_capture_settle") {
+      return value.replace(/\s*(?:\/|j)\s*item\b/i, "/item");
+    }
+    return value;
+  }
+
   function extractTerms(rawText) {
     const text = String(rawText || "").replace(/\r/g, "");
     const priorityMarker = text.search(/Priority\/First\s+(?:Data\s+)?Specific Items/i);
@@ -100,7 +107,10 @@
       const next = matches[index + 1];
       const end = next ? next.start : Math.min(text.length, current.labelEnd + 240);
       const chunk = text.slice(current.labelEnd, end);
-      const value = valueFromChunk(chunk);
+      const value = normalizeTermValue(
+        current.definition.id,
+        valueFromChunk(chunk)
+      );
       if (!value) continue;
       terms.push(Object.freeze({
         id: current.definition.id,

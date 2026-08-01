@@ -39,7 +39,7 @@ const byId = new Map(Array.from(terms, term => [term.id, term]));
 
 assert.equal(byId.get("income_split").value, "80% agent / 20% SignaPay");
 assert.equal(byId.get("interchange_assessments").value, "Pass-Through");
-assert.equal(byId.get("authorization_capture_settle").value, "$0.04 /item");
+assert.equal(byId.get("authorization_capture_settle").value, "$0.04/item");
 assert.match(byId.get("bin_sponsorship").value, /^2\.0 basis points \(0\.020%\)/);
 assert.equal(byId.get("monthly_minimum").value, "$5.00/month");
 assert.equal(byId.get("cancellation_fee").value, "$0.00");
@@ -63,6 +63,25 @@ assert.equal(
   "the actual SignaPay scan must produce 27 cost rows plus its compensation split"
 );
 assert.equal(actualScanResult.status, "extracted");
+
+const itemOcrProductionText = actualScanOcr.replace("$0.04 /item", "$0.04 jitem");
+const itemOcrProductionResult = Extraction.extractionResult(
+  itemOcrProductionText,
+  "ocr"
+);
+const itemOcrProductionById = new Map(
+  Array.from(itemOcrProductionResult.terms, term => [term.id, term])
+);
+assert.equal(
+  itemOcrProductionById.get("authorization_capture_settle").value,
+  "$0.04/item",
+  "OCR jitem must normalize to the Schedule A per-item unit"
+);
+assert.equal(
+  itemOcrProductionResult.terms.length,
+  28,
+  "normalizing the item unit must preserve all Schedule A review items"
+);
 
 const collapsedProductionRows = actualScanOcr.replace(
   "AVS $0.02\nMonthly Minimum",
