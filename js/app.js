@@ -2026,6 +2026,24 @@ async function scheduleAPdfText(pdfBlob, status) {
   }
 }
 
+function updateScheduleAVerificationState() {
+  const review = $('scheduleAReview');
+  const saveButton = $('verifyScheduleATerms');
+  if (!review || !saveButton) return;
+
+  const termChecks = Array.from(
+    review.querySelectorAll('.schedule-term-verified')
+  );
+  const everyTermVerified =
+    termChecks.length > 0 &&
+    termChecks.every(input => input.checked);
+  const coverageConfirmed =
+    $('confirmScheduleACoverage')?.checked === true;
+
+  saveButton.disabled =
+    !(everyTermVerified && coverageConfirmed);
+}
+
 function renderScheduleAReview(profile) {
   const review = $('scheduleAReview');
   if (!review) return;
@@ -2036,7 +2054,9 @@ function renderScheduleAReview(profile) {
   review.innerHTML =
     `<div class="queue-header"><h3>Review Extracted Terms</h3></div>` +
     `<div class="notice warning"><strong>Agent verification required</strong>` +
-    `<p>Compare every value with the source PDF. Edit any OCR error, then check every row.</p></div>` +
+    `<p>Compare every value with the source PDF. Edit any OCR error, then verify the rows.</p></div>` +
+    `<button id="markAllScheduleATerms" class="secondary full-width" type="button">` +
+    `Mark All as Verified</button>` +
     `<div class="settings-card" data-review-profile="${escapeHtml(profile.id)}">` +
     profile.terms.map((term, index) =>
       `<div class="schedule-term" data-term-index="${index}">` +
@@ -2053,10 +2073,29 @@ function renderScheduleAReview(profile) {
     `Add Missing Term</button>` +
     `<div class="settings-card"><label><input id="confirmScheduleACoverage" ` +
     `type="checkbox"> I confirm every row in the source Schedule A is represented</label></div>` +
-    `<button id="verifyScheduleATerms" class="primary full-width" type="button">` +
+    `<button id="verifyScheduleATerms" class="primary full-width" type="button" disabled>` +
     `Save Verified Terms</button>`;
+  const termContainer = review.querySelector('[data-review-profile]');
+  $('markAllScheduleATerms').onclick = () => {
+    termContainer
+      .querySelectorAll('.schedule-term-verified')
+      .forEach(input => {
+        input.checked = true;
+      });
+    updateScheduleAVerificationState();
+  };
+  termContainer.addEventListener('input', event => {
+    if (!event.target.matches('.schedule-term-value, .schedule-term-label-input')) return;
+    const row = event.target.closest('.schedule-term');
+    const verified = row?.querySelector('.schedule-term-verified');
+    if (verified) verified.checked = false;
+    updateScheduleAVerificationState();
+  });
+  termContainer.addEventListener('change', updateScheduleAVerificationState);
+  $('confirmScheduleACoverage').onchange = updateScheduleAVerificationState;
   $('addScheduleATerm').onclick = addMissingScheduleATerm;
   $('verifyScheduleATerms').onclick = () => verifyScheduleATerms(profile.id);
+  updateScheduleAVerificationState();
   review.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
@@ -2073,6 +2112,7 @@ function addMissingScheduleATerm() {
     `aria-label="Missing term value">` +
     `<small>manual · Entered during source review</small></div>`
   );
+  updateScheduleAVerificationState();
 }
 
 async function extractScheduleATerms(profileId, replaceExisting = false) {

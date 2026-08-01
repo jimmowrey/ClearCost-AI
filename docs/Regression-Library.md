@@ -20,6 +20,7 @@ Tests are deterministic and require no network access.
 
 | Test file | Covers | Related decision |
 |-----------|--------|------------------|
+| `tests/schedule-a-bulk-verification.test.mjs` | One-click verification marks every extracted Schedule A row, saving remains blocked until source coverage is confirmed, and editing a reviewed value unchecks only that term | 2026-08-01 Schedule A review efficiency |
 | `tests/schedule-a-extraction.test.mjs` and `tests/schedule-a-profiles.test.mjs` | Schedule A parsing, OCR worker compatibility, split-only completeness detection, storage-level rejection of incomplete extraction, separation of OCR-collapsed AVS / Monthly Minimum rows, and normalization of OCR `jitem` to `/item` | 2026-07-24 Schedule A extraction safety |
 | `tests/fixtures/signapay-schedule-a-actual-ocr.txt` | Actual SignaPay Schedule A OCR must preserve all 27 cost rows plus the 80/20 compensation split | 2026-07-24 ruled-table OCR regression |
 | `tests/test_commerce_control_north_state_additional_statements.mjs` | Real-statement December 2024 and February 2025 Commerce Control detection, split-description recovery, complete processor-scoped fee classification, submitted transaction metrics, and exact reconciliation; includes negative Fiserv and unrelated-processor coverage | 2026-07-23 North State additional-statement verification |
