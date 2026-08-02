@@ -39,6 +39,25 @@
     ["VI-PURCHASING CARD LEVEL 3",1.90,.10],["VI-COMM NON-PASS TRANS CREDIT",2.35,0]
   ];
 
+  const PROGRAM_FEE_ROWS = Object.freeze([
+    ["MASTERCARD ASSESSMENT FEE", "card_brand_assessment"],
+    ["MC ASSESSMNT TRAN AMT >=$1K", "card_brand_assessment"],
+    ["VISA ASSESSMENT FEE CR", "card_brand_assessment"],
+    ["VISA ASSESSMENT FEE DB", "card_brand_assessment"],
+    ["DISCOVER ASSESSMENT FEE", "card_brand_assessment"],
+    ["AXP ACQUIRER TRANS FEE", "card_brand_assessment"],
+    ["AMEX ASSESSMENT FEE", "card_brand_assessment"],
+    ["ACCEL ADVANTAGE DECLINE", "debit_network_interchange"],
+    ["INTERLINK REG", "debit_network_interchange"],
+    ["ACCEL ADVANTAGE", "debit_network_interchange"],
+    ["STAR NE PREFER REG", "debit_network_interchange"],
+    ["MAESTRO REG", "debit_network_interchange"],
+    ["STAR NE PREFER", "debit_network_interchange"],
+    ["MAESTRO", "debit_network_interchange"],
+    ["ACCEL ADVANTAGE REG", "debit_network_interchange"],
+    ["STAR NE", "debit_network_interchange"]
+  ].map(([descriptionPrefix, economicOwner]) => Object.freeze({ descriptionPrefix, economicOwner })));
+
   const SCHEDULES = Object.freeze(RATE_ROWS.map(([alias, percentRate, perItemRate]) => {
     const brand = alias.startsWith("MC-") ? "Mastercard" : "Visa";
     const source = brand === "Mastercard" ? OFFICIAL_SOURCES.mastercard : OFFICIAL_SOURCES.visa;
@@ -102,13 +121,56 @@
     return Object.freeze(rows);
   }
 
+  function parseCommerceControlProgramFeeGap(pages = []) {
+    const parsed = [];
+    for (const catalogRow of PROGRAM_FEE_ROWS) {
+      const prefix = normalize(catalogRow.descriptionPrefix);
+      let match = null;
+      for (const page of pages) {
+        const pageNumber = Number(page.index || page.page || page.page_number || 0);
+        if (pageNumber < 3 || pageNumber > 5) continue;
+        const lines = String(page.text || page.full_text || "").split(/\r?\n/).map(clean).filter(Boolean);
+        const index = lines.findIndex(line => catalogRow.economicOwner === "debit_network_interchange"
+          ? normalize(line) === prefix
+          : normalize(line).startsWith(prefix));
+        if (index < 0) continue;
+        const amountText = lines.slice(index + 1, index + 10).find(line => /^-\$[\d,]+\.\d{2}$/.test(line));
+        if (!amountText) continue;
+        match = Object.freeze({
+          description: lines[index], page: pageNumber, amount: moneyCost(amountText),
+          economicOwner: catalogRow.economicOwner, evidence: `${lines[index]} ${amountText}`
+        });
+        break;
+      }
+      if (match) parsed.push(match);
+    }
+    return Object.freeze(parsed);
+  }
+
+  function auditCommerceControlProgramFeeGap(rows = []) {
+    const assessmentTotal = rows.filter(row => row.economicOwner === "card_brand_assessment")
+      .reduce((sum, row) => sum + cents(row.amount), 0) / 100;
+    const debitNetworkTotal = rows.filter(row => row.economicOwner === "debit_network_interchange")
+      .reduce((sum, row) => sum + cents(row.amount), 0) / 100;
+    const total = (cents(assessmentTotal) + cents(debitNetworkTotal)) / 100;
+    const complete = rows.length === PROGRAM_FEE_ROWS.length && cents(assessmentTotal) === 9557 &&
+      cents(debitNetworkTotal) === 19413 && cents(total) === 28970;
+    return Object.freeze({
+      verified: complete, rows: Object.freeze([...rows]), rowCount: rows.length,
+      assessmentTotal, debitNetworkTotal, total,
+      statementProgramFeeTotal: 1403.91, detailInterchangeTotal: 1114.21,
+      blockReason: complete ? null :
+        "The $289.70 difference between detailed interchange and statement program fees is not fully explained."
+    });
+  }
+
   function cents(value) { return Math.round(Number(value || 0) * 100); }
   function effectiveFor(entry, periodEnd) {
     const end = Date.parse(periodEnd);
     return Number.isFinite(end) && end >= Date.parse(entry.effectiveFrom) &&
       end <= Date.parse(entry.effectiveThrough);
   }
-  function auditCommerceControlRows({ rows = [], statementPeriodEnd, tolerance = .01 } = {}) {
+  function auditCommerceControlRows({ rows = [], programFeeRows = [], statementPeriodEnd, tolerance = .01 } = {}) {
     const audited = rows.map(row => {
       if (row.brand === "Debit network" && cents(row.amount) === 0) {
         return Object.freeze({ ...row, status: "no_interchange_charged", expectedAmount: 0, variance: 0 });
@@ -137,21 +199,25 @@
     const detailTotal = audited.reduce((sum, row) => sum + cents(row.amount), 0) / 100;
     const expectedTotal = audited.reduce((sum, row) => sum + cents(row.expectedAmount), 0) / 100;
     const detailTotalMatches = cents(detailTotal) === 111421;
-    const verified = chargedRows.length > 0 && unresolved.length === 0 && detailTotalMatches;
+    const programFeeGap = auditCommerceControlProgramFeeGap(programFeeRows);
+    const verified = chargedRows.length > 0 && unresolved.length === 0 && detailTotalMatches && programFeeGap.verified;
     return Object.freeze({
       verified, status: verified ? "published_rates_verified" : "not_verified",
       rows: Object.freeze(audited), rowCount: audited.length,
       matchedRowCount: chargedRows.length - unresolved.length,
       unresolved: Object.freeze(unresolved), detailTotal, expectedTotal,
       totalVariance: (cents(detailTotal) - cents(expectedTotal)) / 100,
-      detailTotalMatches,
+      detailTotalMatches, programFeeGap,
       blockReason: verified ? null : unresolved.length
         ? `${unresolved.length} charged interchange row(s) still require a dated published schedule match.`
-        : "Interchange detail does not reconcile to the printed $1,114.21 table total."
+        : !detailTotalMatches
+          ? "Interchange detail does not reconcile to the printed $1,114.21 table total."
+          : programFeeGap.blockReason
     });
   }
 
   global.ClearCostCommerceControlInterchange = Object.freeze({
-    OFFICIAL_SOURCES, SCHEDULES, parseCommerceControlInterchangePages, auditCommerceControlRows
+    OFFICIAL_SOURCES, SCHEDULES, PROGRAM_FEE_ROWS, parseCommerceControlInterchangePages,
+    parseCommerceControlProgramFeeGap, auditCommerceControlProgramFeeGap, auditCommerceControlRows
   });
 })(typeof window !== "undefined" ? window : globalThis);
