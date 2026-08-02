@@ -64,12 +64,17 @@
       : eligibleCents - statementCents;
     const reconciled = statementCents !== null &&
       Math.abs(varianceCents) <= cents(tolerance);
+    const publishedInterchangeVerified =
+      interchangeVerification?.verified === true;
     const verified = eligibleFees.length > 0 &&
       unexplained.length === 0 &&
-      reconciled;
+      reconciled &&
+      publishedInterchangeVerified;
 
     return Object.freeze({
       verified,
+      publishedInterchangeVerified,
+      interchangeVerification,
       status: verified ? "verified" : "not_verified",
       eligibleFeeCount: eligibleFees.length,
       buckets: Object.freeze(
@@ -86,9 +91,12 @@
       unexplained: Object.freeze(unexplained),
       blockReason: verified
         ? null
-        : unexplained.length
-          ? `${unexplained.length} fee(s) require economic-owner review.`
-          : statementCents === null
+        : !publishedInterchangeVerified
+          ? interchangeVerification?.blockReason ||
+            "Published interchange rates have not been independently verified."
+          : unexplained.length
+            ? `${unexplained.length} fee(s) require economic-owner review.`
+            : statementCents === null
             ? "Statement fee total is unavailable."
             : "Cost buckets do not reconcile to the statement total.",
     });
