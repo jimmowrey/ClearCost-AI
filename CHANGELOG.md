@@ -63,3 +63,10 @@ under `Unreleased` until a versioning scheme is adopted (see `docs/Roadmap.md`).
 - Schedule A OCR now renders scanned PDFs on an opaque white canvas and keeps
   automatic page layout for the high-resolution retry so ruled cost tables are
   not reduced to the compensation split alone.
+
+
+## 2026-08-01
+
+- Added Commerce Control pages 5–7 interchange-detail extraction and dated Visa/Mastercard auditing.
+- Separated the $1,114.21 detailed interchange table from the $1,403.91 statement-labeled interchange/program-fee summary.
+- Added Profit Intelligence audit status, matched-row count, unresolved-row count, and regression blocking for missing Discover/Amex primary schedules.
