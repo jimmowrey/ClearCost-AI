@@ -2257,224 +2257,66 @@ async function uploadScheduleA() {
   }
 }
 
+function currentCostOwnership(d = currentDiagnostic()) {
+  const engine = window.ClearCostCostOwnership;
+  if (!engine || !d) return null;
+  return engine.analyzeCostOwnership(
+    d.feeCandidates || [],
+    firstMetricValue(d.metrics?.totalFees),
+    d.reconciliation?.tolerance ?? 0.01
+  );
+}
+
 function buildProfitScenario() {
-  const PI =
-    window
-      .ClearCostProfitIntelligence;
-
-  if (!PI) {
-    throw new Error(
-      'Profit Intelligence browser engine is not loaded.'
-    );
-  }
-
-  const d =
-    currentDiagnostic();
-
+  const d = currentDiagnostic();
   if (!d) {
-    throw new Error(
-      'Run statement extraction before Profit Intelligence.'
-    );
+    throw new Error('Run statement extraction before Profit Intelligence.');
   }
-
-  if (
-    d.reconciliation
-      ?.proposalBlocked
-  ) {
+  if (d.reconciliation?.proposalBlocked) {
     throw new Error(
-      d.reconciliation
-        .blockReason ||
+      d.reconciliation.blockReason ||
       'Reconciliation must be confirmed before proposal analysis.'
     );
   }
-
-  const volume =
-    firstMetricValue(
-      d.metrics
-        ?.grossVolume
+  if (selectedProgram() !== 'traditional') {
+    throw new Error(
+      'Verified fee-owner savings is currently available for Traditional / IC+ only.'
     );
+  }
 
-  const transactions =
-    firstMetricValue(
-      d.metrics
-        ?.transactionCount
-    );
-
-  const currentExpense =
-    firstMetricValue(
-      d.metrics
-        ?.totalFees
-    );
-
-  if (
-    volume === null ||
-    transactions === null ||
-    currentExpense === null
-  ) {
+  const volume = firstMetricValue(d.metrics?.grossVolume);
+  const transactions = firstMetricValue(d.metrics?.transactionCount);
+  const currentExpense = firstMetricValue(d.metrics?.totalFees);
+  if (volume === null || transactions === null || currentExpense === null) {
     throw new Error(
       'Verified volume, transaction count, and total fees are required.'
     );
   }
 
-  const revenue =
-    profitNumber(
-      'verifiedRevenue'
+  const ownership = currentCostOwnership(d);
+  if (!ownership?.verified) {
+    throw new Error(
+      ownership?.blockReason ||
+      'Every statement fee must be assigned to a verified economic owner.'
     );
-
-  const cost =
-    profitNumber(
-      'verifiedInternalCost'
-    );
-
-  const split =
-    profitNumber(
-      'agentSplit'
-    );
-
-  const revenueVerified =
-    $('verifyRevenue')
-      ?.checked ||
-    false;
-
-  const costVerified =
-    $('verifyInternalCost')
-      ?.checked ||
-    false;
-
-  const splitVerified =
-    $('verifyAgentSplit')
-      ?.checked ||
-    false;
-
-  const V =
-    (
-      value,
-      verified,
-      source
-    ) =>
-      verified
-        ? PI.verifiedValue(
-            value,
-            source
-          )
-        : PI.unknownValue(
-            source
-          );
+  }
 
   return {
-    scenarioId:
-      `${d.sourceFile || 'statement'}-${selectedProgram()}`,
-
-    program:
-      selectedProgram(),
-
-    monthlyVolume:
-      volume,
-
-    monthlyTransactions:
-      Math.round(
-        transactions
-      ),
-
-    currentMonthlyProcessingExpense:
-      currentExpense,
-
-    merchantPercentageRate:
-      profitNumber(
-        'merchantPercentageRate'
-      ),
-
-    merchantTransactionFee:
-      profitNumber(
-        'merchantTransactionFee'
-      ),
-
-    merchantMonthlyFee:
-      profitNumber(
-        'merchantMonthlyFee'
-      ),
-
-    merchantEquipmentFee:
-      profitNumber(
-        'merchantEquipmentFee'
-      ),
-
-    cashDiscountPercent:
-      selectedProgram() ===
-      'cash_discount'
-        ? profitNumber(
-            'cashDiscountPercent'
-          )
-        : null,
-
-    customerSurchargePercent:
-      selectedProgram() ===
-      'surcharge'
-        ? profitNumber(
-            'customerSurchargePercent'
-          )
-        : null,
-
-    merchantCreditCardRate:
-      selectedProgram() ===
-      'surcharge'
-        ? profitNumber(
-            'merchantCreditCardRate'
-          )
-        : null,
-
-    merchantExpenseComponents:
-      [],
-
-    revenueComponents: [
-      {
-        name:
-          'Verified program revenue',
-
-        amount:
-          V(
-            revenue,
-            revenueVerified,
-            'Profit Intelligence input'
-          ),
-
-        category:
-          'program_revenue'
-      }
-    ],
-
-    costComponents: [
-      {
-        name:
-          'Verified processor/internal costs',
-
-        amount:
-          V(
-            cost,
-            costVerified,
-            'Profit Intelligence input'
-          ),
-
-        category:
-          'processor_cost'
-      }
-    ],
-
-    agentSplitPercent:
-      V(
-        split,
-        splitVerified,
-        agentSettings.isoProcessorName
-          ? `Agent Settings: ${agentSettings.isoProcessorName}`
-          : 'Agent Settings'
-      ),
-
-    minimumMonthlyResidual:
-      profitNumber(
-        'minimumResidualProfit'
-      )
+    monthlyVolume: volume,
+    monthlyTransactions: Math.round(transactions),
+    currentExpense,
+    costOwnership: ownership,
+    percentageMarkup: profitNumber('merchantPercentageRate'),
+    transactionMarkup: profitNumber('merchantTransactionFee'),
+    monthlyFee: profitNumber('merchantMonthlyFee'),
+    equipmentFee: profitNumber('merchantEquipmentFee'),
+    agentSplitPercent: agentSettings.agentSplitVerified
+      ? Number(agentSettings.agentSplitPercent)
+      : NaN,
+    minimumMonthlyResidual: profitNumber('minimumResidualProfit')
   };
-}function moneyText(
+}
+function moneyText(
   value
 ) {
   return (
@@ -2561,14 +2403,14 @@ function renderProfitResult(
     `</div>` +
 
     `<div class="status-row">` +
-    `<span>Internal gross profit pool</span>` +
+    `<span>Gross program revenue before Schedule A costs</span>` +
     `<strong>${moneyText(
       result.grossProfitPool
     )}</strong>` +
     `</div>` +
 
     `<div class="status-row">` +
-    `<span>Projected monthly residual</span>` +
+    `<span>Preliminary residual before Schedule A costs</span>` +
     `<strong>${moneyText(
       result.projectedMonthlyResidual
     )}</strong>` +
@@ -2631,36 +2473,48 @@ function renderProfitResult(
 
 function calculateProfitability() {
   try {
-    state.profitScenario =
-      window
-        .ClearCostProfitIntelligence
-        .calculateProfitScenario(
-          buildProfitScenario()
-        );
+    const input = buildProfitScenario();
+    const proposal = window.ClearCostCostOwnership
+      .calculateTraditionalProposal(input);
+    if (!proposal.verified) {
+      throw new Error(proposal.blockReason);
+    }
 
-    renderProfitResult(
-      state.profitScenario
-    );
+    const meetsTarget =
+      proposal.projectedMonthlyResidual >= input.minimumMonthlyResidual;
 
-  } catch (
-    error
-  ) {
-    const resultNode =
-      $('profitResult');
+    state.profitScenario = {
+      ...proposal,
+      projectedMerchantExpense: proposal.proposedMerchantExpense,
+      projectedMonthlySavings: proposal.monthlySavings,
+      projectedAnnualSavings: proposal.annualSavings,
+      grossProfitPool: proposal.grossProgramRevenue,
+      profitabilityStatus: 'not_verified',
+      readyToPresent: false,
+      missingVerifiedInputs: ['schedule_a_cost_applicability'],
+      warnings: [
+        meetsTarget
+          ? 'Savings are calculated from verified statement cost ownership and the selected merchant markups.'
+          : 'The projected residual is below the configured minimum.',
+        'Ready to Present remains blocked until each applicable SignaPay Schedule A cost is evaluated for this merchant.'
+      ],
+      audit: [
+        `Current fee ownership: interchange ${moneyText(input.costOwnership.buckets.wholesale_interchange)}, assessments ${moneyText(input.costOwnership.buckets.network)}, third-party ${moneyText(input.costOwnership.buckets.third_party)}, processor markup ${moneyText(input.costOwnership.buckets.processor_revenue)}.`,
+        `Proposal pass-through baseline = ${moneyText(proposal.passThroughCost)}.`,
+        `My percentage markup revenue = ${moneyText(proposal.percentageMarkupRevenue)}.`,
+        `My transaction markup revenue = ${moneyText(proposal.transactionMarkupRevenue)}.`,
+        `Monthly and equipment revenue = ${moneyText(proposal.fixedRevenue)}.`,
+        'Residual is provisional until applicable Schedule A costs are deducted.'
+      ]
+    };
 
-    if (
-      resultNode
-    ) {
+    renderProfitResult(state.profitScenario);
+  } catch (error) {
+    const resultNode = $('profitResult');
+    if (resultNode) {
       resultNode.innerHTML =
-        `<div class="notice error">` +
-        `<strong>Profit Intelligence blocked</strong>` +
-        `<p>${escapeHtml(
-          String(
-            error.message ||
-            error
-          )
-        )}</p>` +
-        `</div>`;
+        `<div class="notice error"><strong>Profit Intelligence blocked</strong>` +
+        `<p>${escapeHtml(String(error.message || error))}</p></div>`;
     }
   }
 }
@@ -2742,6 +2596,32 @@ function openProfitability() {
               ?.totalFees
           )
         );
+    }
+
+    const ownership = currentCostOwnership(d);
+    const setOwnershipValue = (id, value) => {
+      if ($(id)) $(id).textContent = moneyText(value);
+    };
+    setOwnershipValue(
+      'profitInterchange',
+      ownership?.verified ? ownership.buckets.wholesale_interchange : null
+    );
+    setOwnershipValue(
+      'profitAssessments',
+      ownership?.verified ? ownership.buckets.network : null
+    );
+    setOwnershipValue(
+      'profitThirdParty',
+      ownership?.verified ? ownership.buckets.third_party : null
+    );
+    setOwnershipValue(
+      'profitProcessorMarkup',
+      ownership?.incumbentProcessorMarkup
+    );
+    if ($('profitOwnershipStatus')) {
+      $('profitOwnershipStatus').textContent = ownership?.verified
+        ? 'Verified — all fees explained'
+        : ownership?.blockReason || 'Not verified';
     }
   }
 

@@ -20,6 +20,7 @@ Tests are deterministic and require no network access.
 
 | Test file | Covers | Related decision |
 |-----------|--------|------------------|
+| `tests/cost-ownership.test.mjs` | Economic-owner buckets, verified incumbent processor markup, Commerce Control duplicate-detail exclusion, exact total reconciliation, unknown-fee blocking, and proposal savings from separate percentage and transaction markups | 2026-08-01 verified cost ownership |
 | `tests/schedule-a-bulk-verification.test.mjs` | One-click verification marks every extracted Schedule A row, saving remains blocked until source coverage is confirmed, and editing a reviewed value unchecks only that term | 2026-08-01 Schedule A review efficiency |
 | `tests/schedule-a-extraction.test.mjs` and `tests/schedule-a-profiles.test.mjs` | Schedule A parsing, OCR worker compatibility, split-only completeness detection, storage-level rejection of incomplete extraction, separation of OCR-collapsed AVS / Monthly Minimum rows, and normalization of OCR `jitem` to `/item` | 2026-07-24 Schedule A extraction safety |
 | `tests/fixtures/signapay-schedule-a-actual-ocr.txt` | Actual SignaPay Schedule A OCR must preserve all 27 cost rows plus the 80/20 compensation split | 2026-07-24 ruled-table OCR regression |
