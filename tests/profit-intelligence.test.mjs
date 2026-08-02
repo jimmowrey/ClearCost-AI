@@ -112,4 +112,51 @@ const V = PI.verifiedValue;
   assert.equal(high.projectedMerchantExpense - low.projectedMerchantExpense, 500);
 }
 
+{
+  const breakdown = PI.calculateCurrentCostBreakdown({
+    statementFeeTotal: 1501.57,
+    monthlyVolume: 82756.12,
+    eligibleBuckets: {
+      wholesale_interchange: 1300,
+      network: 103.91,
+      processor_revenue: 85.58,
+      third_party: 12.08,
+      unknown: 0,
+    },
+    unknownFeeCount: 0,
+  });
+
+  assert.equal(breakdown.interchange, 1300);
+  assert.equal(breakdown.assessments, 103.91);
+  assert.equal(breakdown.otherPassThrough, 12.08);
+  assert.equal(breakdown.processorMarkup, 85.58);
+  assert.equal(breakdown.accountedTotal, 1501.57);
+  assert.equal(breakdown.variance, 0);
+  assert.equal(breakdown.verified, true);
+  assert.equal(breakdown.processorMarkupRatePercent, 0.1034);
+  assert.equal(breakdown.processorMarkupBasisPoints, 10.3412);
+}
+
+{
+  const unexplained = PI.calculateCurrentCostBreakdown({
+    statementFeeTotal: 1501.57,
+    monthlyVolume: 82756.12,
+    eligibleBuckets: {
+      wholesale_interchange: 1403.91,
+      network: 0,
+      processor_revenue: 85.58,
+      third_party: 0,
+      unknown: 12.08,
+    },
+    unknownFeeCount: 1,
+  });
+
+  assert.equal(unexplained.verified, false);
+  assert.equal(unexplained.status, "requires_review");
+  assert.match(
+    unexplained.warnings[0],
+    /Unknown fees must be reviewed/
+  );
+}
+
 console.log("Profit Intelligence browser regression tests passed.");
