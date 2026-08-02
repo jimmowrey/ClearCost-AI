@@ -11,7 +11,9 @@ its source/authority, and links to the code and tests that enforce it.
 
 | Rule ID | Statement | Rationale | Source | Enforced by |
 |---------|-----------|-----------|--------|-------------|
-| _TBD_ | _placeholder_ | _placeholder_ | _placeholder_ | _placeholder_ |
+| COST-001 | Every reconciliation-eligible statement charge must be assigned to interchange, card-brand/network assessments, genuine third-party pass-through, processor-controlled revenue, or unknown/requires review. | Processor markup cannot be inferred safely from unexplained charges. | Product owner, 2026-08-01 | `js/cost-ownership.js`; `tests/cost-ownership.test.mjs` |
+| COST-002 | Processor markup and savings remain not verified if any eligible fee is unknown or if the ownership buckets do not reconcile to the printed statement fee total within tolerance. | Unknown dollars must not be silently treated as processor profit or pass-through. | Product owner, 2026-08-01 | `js/cost-ownership.js`; `tests/cost-ownership.test.mjs` |
+| COST-003 | Merchant-facing savings never expose agent wholesale costs, markup, split, commission, or residual. | Merchant data and internal agent economics must remain separate. | Product owner, confirmed project principle | Proposal layer (merchant report pending) |
 
 ## Data integrity (confirmed principles)
 
