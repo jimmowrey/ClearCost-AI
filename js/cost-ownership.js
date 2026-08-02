@@ -27,7 +27,7 @@
     );
   }
 
-  function analyzeCostOwnership(fees = [], statementTotal = null, tolerance = 0.01) {
+  function analyzeCostOwnership(fees = [], statementTotal = null, tolerance = 0.01, interchangeVerification = null) {
     const bucketCents = Object.fromEntries(BUCKETS.map(bucket => [bucket, 0]));
     const unexplained = [];
     const eligibleFees = [];
