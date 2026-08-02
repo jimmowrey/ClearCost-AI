@@ -209,6 +209,38 @@ const result = await runStatementIntelligencePipeline(
   assert.equal(r.feeReconciliationStatus, RECONCILIATION_STATUS.FEE_RECONCILED);
 }
 
+// ── 5a. Every fee dollar has an economic owner for markup analysis ──────────
+{
+  const buckets = result.feeSummary.reconciliationEligibleBuckets;
+  const bucketCents = Object.values(buckets).reduce(
+    (total, amount) => total + Math.round(Number(amount) * 100),
+    0
+  );
+
+  assert.equal(
+    bucketCents,
+    150157,
+    'eligible economic buckets reconcile exactly to the statement total'
+  );
+  assert.equal(
+    buckets.unknown,
+    0,
+    'no unexplained fee may remain before processor markup is verified'
+  );
+  assert.equal(
+    Math.round(
+      (
+        buckets.wholesale_interchange +
+        buckets.network +
+        buckets.processor_revenue +
+        buckets.third_party
+      ) * 100
+    ),
+    150157,
+    'interchange, assessments, processor revenue, and pass-through costs explain every dollar'
+  );
+}
+
 // ── 6. Displayed metrics: "Fees found" and "Unknown fees" ────────────────────
 {
   // "Fees found" is feeCandidates.length; the app also shows classified /
