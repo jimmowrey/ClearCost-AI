@@ -2315,6 +2315,7 @@ function buildProfitScenario() {
       : NaN,
     minimumMonthlyResidual: profitNumber('minimumResidualProfit')
   };
+}
 function moneyText(
   value
 ) {
