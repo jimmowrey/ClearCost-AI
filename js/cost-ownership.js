@@ -80,9 +80,6 @@
       incumbentProcessorMarkup: verified
         ? money(bucketCents.processor_revenue)
         : null,
-      incumbentMarkupPercent: verified && Number(statementTotal) >= 0
-        ? null
-        : null,
       eligibleTotal: money(eligibleCents),
       statementTotal: statementCents === null ? null : money(statementCents),
       variance: varianceCents === null ? null : money(varianceCents),
