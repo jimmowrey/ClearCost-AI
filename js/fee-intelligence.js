@@ -554,6 +554,17 @@ export function summarizeFees(fees=[]){
     },
 
     categories:
+      {},
+
+    reconciliationEligibleBuckets: {
+      wholesale_interchange: 0,
+      network: 0,
+      processor_revenue: 0,
+      third_party: 0,
+      unknown: 0
+    },
+
+    reconciliationEligibleCategories:
       {}
   };
 
@@ -605,6 +616,32 @@ export function summarizeFees(fees=[]){
         fee.amount ||
         0
       );
+
+    if (
+      isReconciliationEligible(
+        fee
+      )
+    ) {
+      summary.reconciliationEligibleBuckets[bucket] =
+        (
+          summary.reconciliationEligibleBuckets[bucket] ||
+          0
+        ) +
+        Number(
+          fee.amount ||
+          0
+        );
+
+      summary.reconciliationEligibleCategories[category] =
+        (
+          summary.reconciliationEligibleCategories[category] ||
+          0
+        ) +
+        Number(
+          fee.amount ||
+          0
+        );
+    }
   }
 
   summary.totalAmount =
@@ -629,17 +666,26 @@ export function summarizeFees(fees=[]){
   }
 
   for (
-    const key of
-    Object.keys(
-      summary.categories
-    )
+    const collection of
+    [
+      summary.categories,
+      summary.reconciliationEligibleBuckets,
+      summary.reconciliationEligibleCategories
+    ]
   ) {
-    summary.categories[key] =
-      Number(
-        summary.categories[key].toFixed(
-          2
-        )
-      );
+    for (
+      const key of
+      Object.keys(
+        collection
+      )
+    ) {
+      collection[key] =
+        Number(
+          collection[key].toFixed(
+            2
+          )
+        );
+    }
   }
 
   summary.reconciliationEligibleCents =
