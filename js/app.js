@@ -2731,17 +2731,102 @@ function openProfitability() {
         'Not verified';
     }
 
+    const currentExpense =
+      firstMetricValue(
+        d.metrics
+          ?.totalFees
+      );
+
     if (
       $('profitCurrentExpense')
     ) {
       $('profitCurrentExpense')
         .textContent =
         moneyText(
-          firstMetricValue(
-            d.metrics
-              ?.totalFees
-          )
+          currentExpense
         );
+    }
+
+    const currentCostBreakdown =
+      window
+        .ClearCostProfitIntelligence
+        .calculateCurrentCostBreakdown({
+          statementFeeTotal:
+            currentExpense,
+
+          monthlyVolume:
+            firstMetricValue(
+              d.metrics
+                ?.grossVolume
+            ),
+
+          eligibleBuckets:
+            d.feeSummary
+              ?.reconciliationEligibleBuckets ||
+            {},
+
+          unknownFeeCount:
+            (
+              d.unknownFees ||
+              []
+            ).length
+        });
+
+    const currentCostValues = {
+      profitInterchange:
+        moneyText(
+          currentCostBreakdown
+            .interchange
+        ),
+
+      profitAssessments:
+        moneyText(
+          currentCostBreakdown
+            .assessments
+        ),
+
+      profitOtherPassThrough:
+        moneyText(
+          currentCostBreakdown
+            .otherPassThrough
+        ),
+
+      profitProcessorMarkup:
+        moneyText(
+          currentCostBreakdown
+            .processorMarkup
+        ),
+
+      profitProcessorMarkupRate:
+        currentCostBreakdown
+          .processorMarkupRatePercent ===
+        null
+          ? 'Not verified'
+          : `${currentCostBreakdown.processorMarkupRatePercent.toFixed(4)}% · ${currentCostBreakdown.processorMarkupBasisPoints.toFixed(2)} bps`,
+
+      profitMarkupStatus:
+        currentCostBreakdown
+          .verified
+          ? 'Verified — all fees explained'
+          : 'Not verified — fee review required'
+    };
+
+    for (
+      const [
+        id,
+        value
+      ] of
+      Object.entries(
+        currentCostValues
+      )
+    ) {
+      if (
+        $(id)
+      ) {
+        $(id)
+          .textContent =
+          value;
+      }
     }
   }
 
