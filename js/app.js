@@ -2402,14 +2402,14 @@ function renderProfitResult(
     `</div>` +
 
     `<div class="status-row">` +
-    `<span>Internal gross profit pool</span>` +
+    `<span>Gross program revenue before Schedule A costs</span>` +
     `<strong>${moneyText(
       result.grossProfitPool
     )}</strong>` +
     `</div>` +
 
     `<div class="status-row">` +
-    `<span>Projected monthly residual</span>` +
+    `<span>Preliminary residual before Schedule A costs</span>` +
     `<strong>${moneyText(
       result.projectedMonthlyResidual
     )}</strong>` +
