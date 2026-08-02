@@ -255,6 +255,70 @@
     });
   }
 
+  function calculateCurrentCostBreakdown({
+    statementFeeTotal,
+    monthlyVolume,
+    eligibleBuckets = {},
+    unknownFeeCount = 0,
+  } = {}) {
+    const total = roundMoney(statementFeeTotal);
+    const volume = Number(monthlyVolume);
+    const bucket = name => roundMoney(Number(eligibleBuckets[name] || 0));
+
+    if (!Number.isFinite(total) || total < 0) {
+      throw new Error("A non-negative statement fee total is required.");
+    }
+
+    if (!Number.isFinite(volume) || volume < 0) {
+      throw new Error("A non-negative monthly volume is required.");
+    }
+
+    const interchange = bucket("wholesale_interchange");
+    const assessments = bucket("network");
+    const processorMarkup = bucket("processor_revenue");
+    const otherPassThrough = bucket("third_party");
+    const unknown = bucket("unknown");
+    const accountedTotal = roundMoney(
+      interchange + assessments + processorMarkup + otherPassThrough + unknown
+    );
+    const variance = roundMoney(total - accountedTotal);
+    const verified =
+      Number(unknownFeeCount) === 0 &&
+      unknown === 0 &&
+      Math.abs(variance) <= 0.01;
+
+    return Object.freeze({
+      totalMerchantExpense: total,
+      interchange,
+      assessments,
+      otherPassThrough,
+      processorMarkup,
+      unknown,
+      accountedTotal,
+      variance,
+      processorMarkupRatePercent:
+        volume > 0
+          ? roundRate((processorMarkup / volume) * 100)
+          : null,
+      processorMarkupBasisPoints:
+        volume > 0
+          ? roundRate((processorMarkup / volume) * 10000)
+          : null,
+      verified,
+      status:
+        verified
+          ? "verified"
+          : "requires_review",
+      warnings: verified
+        ? []
+        : [
+            Number(unknownFeeCount) > 0 || unknown !== 0
+              ? "Unknown fees must be reviewed before processor markup is verified."
+              : "Fee buckets do not reconcile to the statement total."
+          ],
+    });
+  }
+
   function getProfitBadge(result) {
     switch (result.profitabilityStatus) {
       case ProfitabilityStatus.VERIFIED_PROFITABLE:
@@ -274,6 +338,7 @@
     verifiedValue,
     unknownValue,
     calculateProfitScenario,
+    calculateCurrentCostBreakdown,
     getProfitBadge,
   });
 })(typeof window !== "undefined" ? window : globalThis);
