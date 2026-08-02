@@ -58,6 +58,39 @@
     ["STAR NE", "debit_network_interchange"]
   ].map(([descriptionPrefix, economicOwner]) => Object.freeze({ descriptionPrefix, economicOwner })));
 
+  const NON_PROGRAM_FEE_ROWS = Object.freeze([
+    ["MC AUTH CONNECTIVITY FEE", "card_network"],
+    ["MASTERCARD DEBIT SALES DISC", "processor_revenue"],
+    ["MC LICENSE VOLUME FEE", "card_network"],
+    ["MASTERCARD SALES DISCOUNT", "processor_revenue"],
+    ["MC ACQUIRER AVS BILLING", "card_network"],
+    ["MC CVC2 TRANSACTION FEE", "card_network"],
+    ["MC NETWORK ACCESS AUTH FEE", "card_network"],
+    ["VISA SALES DISCOUNT", "processor_revenue"],
+    ["VISA DEBIT SALES DISCOUNT", "processor_revenue"],
+    ["VI NTWK ACQ PROC FEE US CR", "card_network"],
+    ["VI NTWK ACQ PROC FEE US DB/PP", "card_network"],
+    ["DISCOVER DATA USAGE FEE", "card_network"],
+    ["DISCOVER SALES DISCOUNT", "processor_revenue"],
+    ["NETWORK AUTHORIZATION FEE", "card_network"],
+    ["ADDRS VERIFICATION SERVICE FEE", "card_network"],
+    ["CARDPOINTE PLATFORM FEE", "third_party_platform"],
+    ["VI BASE II CR VCHER FEE US CR", "card_network"],
+    ["VI BASE II SYSTEM FILE FEE", "card_network"],
+    ["VI BASE II CR VCHER FEE US D/P", "card_network"],
+    ["AMEX SALES DISCOUNT", "processor_revenue"],
+    ["DIGITAL INVESTMENT FEE", "card_network"],
+    ["MC CLEARING CONNECTIVITY FEE", "card_network"],
+    ["GEN. DEBIT TRANSACTION FEE", "processor_revenue"],
+    ["ONLINE DEBIT DENIAL", "processor_revenue"],
+    ["VI-COMMERCIAL SOLUTIONS FEE", "card_network"],
+    ["STAR TOKEN EXCHANGE DEBIT FEE", "card_network"],
+    ["REGULATORY PRODUCT FEE", "processor_revenue"],
+    ["MC MONTHLY LOCATION FEE", "card_network"],
+    ["VISA NETWORK FEE CP 1B-01", "card_network"],
+    ["VI TRANSACTION INTEGRITY FEE", "card_network"]
+  ].map(([descriptionPrefix, economicOwner]) => Object.freeze({ descriptionPrefix, economicOwner })));
+
   const SCHEDULES = Object.freeze(RATE_ROWS.map(([alias, percentRate, perItemRate]) => {
     const brand = alias.startsWith("MC-") ? "Mastercard" : "Visa";
     const source = brand === "Mastercard" ? OFFICIAL_SOURCES.mastercard : OFFICIAL_SOURCES.visa;
@@ -164,13 +197,56 @@
     });
   }
 
+  function parseCommerceControlNonProgramFees(pages = []) {
+    const parsed = [];
+    for (const catalogRow of NON_PROGRAM_FEE_ROWS) {
+      const prefix = normalize(catalogRow.descriptionPrefix);
+      let match = null;
+      for (const page of pages) {
+        const pageNumber = Number(page.index || page.page || page.page_number || 0);
+        if (pageNumber < 3 || pageNumber > 5) continue;
+        const lines = String(page.text || page.full_text || "").split(/\r?\n/).map(clean).filter(Boolean);
+        const index = lines.findIndex(line => normalize(line).startsWith(prefix));
+        if (index < 0) continue;
+        const amountText = lines.slice(index + 1, index + 10).find(line => /^-\$[\d,]+\.\d{2}$/.test(line));
+        if (!amountText) continue;
+        match = Object.freeze({
+          description: lines[index], page: pageNumber, amount: moneyCost(amountText),
+          economicOwner: catalogRow.economicOwner, evidence: `${lines[index]} ${amountText}`
+        });
+        break;
+      }
+      if (match) parsed.push(match);
+    }
+    return Object.freeze(parsed);
+  }
+
+  function auditCommerceControlNonProgramFees(rows = []) {
+    const totals = Object.fromEntries(["processor_revenue", "third_party_platform", "card_network"]
+      .map(owner => [owner, rows.filter(row => row.economicOwner === owner)
+        .reduce((sum, row) => sum + cents(row.amount), 0) / 100]));
+    const total = Object.values(totals).reduce((sum, value) => sum + cents(value), 0) / 100;
+    const complete = rows.length === NON_PROGRAM_FEE_ROWS.length &&
+      cents(totals.processor_revenue) === 5208 &&
+      cents(totals.third_party_platform) === 3495 &&
+      cents(totals.card_network) === 1063 && cents(total) === 9766;
+    return Object.freeze({
+      verified: complete, rows: Object.freeze([...rows]), rowCount: rows.length,
+      processorRevenue: totals.processor_revenue,
+      thirdPartyPlatform: totals.third_party_platform,
+      cardNetworkFees: totals.card_network, total,
+      statementServiceCharges: 85.58, statementOtherFees: 12.08,
+      blockReason: complete ? null : "The $97.66 outside interchange/program fees is not fully explained."
+    });
+  }
+
   function cents(value) { return Math.round(Number(value || 0) * 100); }
   function effectiveFor(entry, periodEnd) {
     const end = Date.parse(periodEnd);
     return Number.isFinite(end) && end >= Date.parse(entry.effectiveFrom) &&
       end <= Date.parse(entry.effectiveThrough);
   }
-  function auditCommerceControlRows({ rows = [], programFeeRows = [], statementPeriodEnd, tolerance = .01 } = {}) {
+  function auditCommerceControlRows({ rows = [], programFeeRows = [], nonProgramFeeRows = [], statementPeriodEnd, tolerance = .01 } = {}) {
     const audited = rows.map(row => {
       if (row.brand === "Debit network" && cents(row.amount) === 0) {
         return Object.freeze({ ...row, status: "no_interchange_charged", expectedAmount: 0, variance: 0 });
@@ -200,6 +276,7 @@
     const expectedTotal = audited.reduce((sum, row) => sum + cents(row.expectedAmount), 0) / 100;
     const detailTotalMatches = cents(detailTotal) === 111421;
     const programFeeGap = auditCommerceControlProgramFeeGap(programFeeRows);
+    const nonProgramFees = auditCommerceControlNonProgramFees(nonProgramFeeRows);
     const verified = chargedRows.length > 0 && unresolved.length === 0 && detailTotalMatches && programFeeGap.verified;
     return Object.freeze({
       verified, status: verified ? "published_rates_verified" : "not_verified",
@@ -207,7 +284,7 @@
       matchedRowCount: chargedRows.length - unresolved.length,
       unresolved: Object.freeze(unresolved), detailTotal, expectedTotal,
       totalVariance: (cents(detailTotal) - cents(expectedTotal)) / 100,
-      detailTotalMatches, programFeeGap,
+      detailTotalMatches, programFeeGap, nonProgramFees,
       blockReason: verified ? null : unresolved.length
         ? `${unresolved.length} charged interchange row(s) still require a dated published schedule match.`
         : !detailTotalMatches
@@ -217,7 +294,8 @@
   }
 
   global.ClearCostCommerceControlInterchange = Object.freeze({
-    OFFICIAL_SOURCES, SCHEDULES, PROGRAM_FEE_ROWS, parseCommerceControlInterchangePages,
+    OFFICIAL_SOURCES, SCHEDULES, PROGRAM_FEE_ROWS, NON_PROGRAM_FEE_ROWS, parseCommerceControlInterchangePages,
     parseCommerceControlProgramFeeGap, auditCommerceControlProgramFeeGap, auditCommerceControlRows
+    , parseCommerceControlNonProgramFees, auditCommerceControlNonProgramFees
   });
 })(typeof window !== "undefined" ? window : globalThis);
