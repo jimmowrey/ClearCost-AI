@@ -206,3 +206,12 @@ while preserving behaviour and backward compatibility. That migration is
 intentionally **out of scope** here and is deferred to a separate branch and
 pull request. The full documentation framework (`docs/`, `Regression-Library.md`,
 `Architecture.md`, etc.) will be created in the dedicated documentation sprint.
+
+
+## 2026-08-01 — Published-rate proof is separate from statement reconciliation
+
+**Decision:** A processor's label and internally correct fee arithmetic establish only statement-reported interchange. ClearCost AI may label interchange, incumbent processor markup, or savings as verified only after every interchange detail row is matched to the card-brand schedule effective for the statement period, its expected percentage-plus-item charge is recalculated, and the detail rows reconcile to the statement-reported interchange total.
+
+**Blocking rule:** Unmatched schedules, ambiguous aliases, rate variances, missing detail rows, or incomplete detail-to-summary coverage block verified markup, residual, and merchant savings.
+
+**Implementation:** `js/interchange-verification.js`, `js/cost-ownership.js`.
