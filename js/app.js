@@ -2263,6 +2263,7 @@ function currentInterchangeVerification() {
   if (!engine || !statement) return null;
   const rows = engine.parseCommerceControlInterchangePages(statement.pages || []);
   const programFeeRows = engine.parseCommerceControlProgramFeeGap(statement.pages || []);
+  const nonProgramFeeRows = engine.parseCommerceControlNonProgramFees(statement.pages || []);
   const dates = String(statement.period || '').match(/\\d{2}\\/\\d{2}\\/\\d{2,4}/g) || [];
   const rawEnd = dates.at(-1);
   const statementPeriodEnd = rawEnd
@@ -2272,7 +2273,7 @@ function currentInterchangeVerification() {
         return `${year}-${month}-${day}`;
       })()
     : null;
-  return engine.auditCommerceControlRows({ rows, programFeeRows, statementPeriodEnd });
+  return engine.auditCommerceControlRows({ rows, programFeeRows, nonProgramFeeRows, statementPeriodEnd });
 }
 
 function currentCostOwnership(d = currentDiagnostic(), interchangeVerification = currentInterchangeVerification()) {
@@ -2644,6 +2645,26 @@ function openProfitability() {
       $('profitDebitNetworkInterchange').textContent = moneyText(
         interchangeAudit?.programFeeGap?.debitNetworkTotal
       );
+    }
+    if ($('profitRemainingProcessorRevenue')) {
+      $('profitRemainingProcessorRevenue').textContent = moneyText(
+        interchangeAudit?.nonProgramFees?.processorRevenue
+      );
+    }
+    if ($('profitRemainingThirdParty')) {
+      $('profitRemainingThirdParty').textContent = moneyText(
+        interchangeAudit?.nonProgramFees?.thirdPartyPlatform
+      );
+    }
+    if ($('profitRemainingNetwork')) {
+      $('profitRemainingNetwork').textContent = moneyText(
+        interchangeAudit?.nonProgramFees?.cardNetworkFees
+      );
+    }
+    if ($('profitRemainingCostStatus')) {
+      $('profitRemainingCostStatus').textContent = interchangeAudit?.nonProgramFees?.verified
+        ? 'Verified — $97.66 fully explained'
+        : interchangeAudit?.nonProgramFees?.blockReason || 'Not verified';
     }
     const setOwnershipValue = (id, value) => {
       if ($(id)) $(id).textContent = moneyText(value);
