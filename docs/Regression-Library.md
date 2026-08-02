@@ -45,3 +45,6 @@ Tests are deterministic and require no network access.
 ## Open questions
 
 <!-- TODO -->
+
+
+| Interchange schedule verification | Dated schedule matching, percentage-plus-item expected cost, variance detection, unresolved-row blocking, and detail-to-summary coverage | `tests/interchange-verification.test.mjs`; `tests/cost-ownership.test.mjs` |
