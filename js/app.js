@@ -2257,13 +2257,31 @@ async function uploadScheduleA() {
   }
 }
 
-function currentCostOwnership(d = currentDiagnostic()) {
+function currentInterchangeVerification() {
+  const engine = window.ClearCostCommerceControlInterchange;
+  const statement = state.results[0];
+  if (!engine || !statement) return null;
+  const rows = engine.parseCommerceControlInterchangePages(statement.pages || []);
+  const dates = String(statement.period || '').match(/\\d{2}\\/\\d{2}\\/\\d{2,4}/g) || [];
+  const rawEnd = dates.at(-1);
+  const statementPeriodEnd = rawEnd
+    ? (() => {
+        const [month, day, rawYear] = rawEnd.split('/');
+        const year = rawYear.length === 2 ? `20${rawYear}` : rawYear;
+        return `${year}-${month}-${day}`;
+      })()
+    : null;
+  return engine.auditCommerceControlRows({ rows, statementPeriodEnd });
+}
+
+function currentCostOwnership(d = currentDiagnostic(), interchangeVerification = currentInterchangeVerification()) {
   const engine = window.ClearCostCostOwnership;
   if (!engine || !d) return null;
   return engine.analyzeCostOwnership(
     d.feeCandidates || [],
     firstMetricValue(d.metrics?.totalFees),
-    d.reconciliation?.tolerance ?? 0.01
+    d.reconciliation?.tolerance ?? 0.01,
+    interchangeVerification
   );
 }
 
@@ -2598,7 +2616,21 @@ function openProfitability() {
         );
     }
 
-    const ownership = currentCostOwnership(d);
+    const interchangeAudit = currentInterchangeVerification();
+    const ownership = currentCostOwnership(d, interchangeAudit);
+    if ($('profitPublishedAudit')) {
+      $('profitPublishedAudit').textContent = interchangeAudit?.verified
+        ? 'Verified — every charged detail row matched'
+        : interchangeAudit?.blockReason || 'Not verified';
+    }
+    if ($('profitDetailTotal')) {
+      $('profitDetailTotal').textContent = moneyText(interchangeAudit?.detailTotal);
+    }
+    if ($('profitPublishedMatches')) {
+      $('profitPublishedMatches').textContent = interchangeAudit
+        ? `${interchangeAudit.matchedRowCount} matched · ${interchangeAudit.unresolved.length} unresolved`
+        : 'Not verified';
+    }
     const setOwnershipValue = (id, value) => {
       if ($(id)) $(id).textContent = moneyText(value);
     };

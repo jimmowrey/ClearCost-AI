@@ -48,3 +48,12 @@ Tests are deterministic and require no network access.
 
 
 | Interchange schedule verification | Dated schedule matching, percentage-plus-item expected cost, variance detection, unresolved-row blocking, and detail-to-summary coverage | `tests/interchange-verification.test.mjs`; `tests/cost-ownership.test.mjs` |
+
+
+## Commerce Control interchange detail — January 2025
+
+- Extracts all 53 non-total rows from pages 5–7 with page, description, volume, count, percentage rate, per-item rate, and charged amount.
+- Reconciles the detail table independently to $1,114.21; it must not be forced to the broader $1,403.91 Interchange Charges/Program Fees summary.
+- Matches 13 Mastercard and 26 Visa rows against the schedule effective for January 2025.
+- Keeps four Discover and two Amex rows unresolved until dated primary schedule evidence is loaded; processor markup and savings remain blocked.
+- Regression: `tests/commerce-control-interchange-detail.test.mjs`.
