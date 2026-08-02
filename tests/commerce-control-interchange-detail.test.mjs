@@ -13,6 +13,7 @@ const engine = context.globalThis.ClearCostCommerceControlInterchange;
 const pages = fixture.pages.map(page => ({ page_number: page.page_number, full_text: page.full_text }));
 const rows = engine.parseCommerceControlInterchangePages(pages);
 const programFeeRows = engine.parseCommerceControlProgramFeeGap(pages);
+const nonProgramFeeRows = engine.parseCommerceControlNonProgramFees(pages);
 
 assert.equal(rows.length, 53, "all 53 non-total detail rows from pages 5–7 are extracted");
 assert.equal(rows.filter(row => row.brand === "Mastercard").length, 13);
@@ -30,9 +31,17 @@ assert.equal(programFeeGap.debitNetworkTotal, 194.13);
 assert.equal(programFeeGap.total, 289.70);
 assert.equal(Math.round((programFeeGap.detailInterchangeTotal + programFeeGap.total) * 100), 140391);
 
+assert.equal(nonProgramFeeRows.length, 30, "all service-charge and other-fee rows are extracted");
+const nonProgramFees = engine.auditCommerceControlNonProgramFees(nonProgramFeeRows);
+assert.equal(nonProgramFees.verified, true);
+assert.equal(nonProgramFees.processorRevenue, 52.08);
+assert.equal(nonProgramFees.thirdPartyPlatform, 34.95);
+assert.equal(nonProgramFees.cardNetworkFees, 10.63);
+assert.equal(nonProgramFees.total, 97.66);
+assert.equal(Math.round((programFeeGap.detailInterchangeTotal + programFeeGap.total + nonProgramFees.total) * 100), 150157);
+
 const audit = engine.auditCommerceControlRows({
-  rows,
-  programFeeRows,
+  rows, programFeeRows, nonProgramFeeRows,
   statementPeriodEnd: "2025-01-31"
 });
 assert.equal(audit.detailTotal, 1114.21);
@@ -48,7 +57,7 @@ assert.match(audit.blockReason, /6 charged interchange row/);
 const paddedRows = rows.map(row => row.description === "MC-WORLD ELITE MERIT III"
   ? { ...row, amount: row.amount + 5 } : row);
 const padded = engine.auditCommerceControlRows({
-  rows: paddedRows, programFeeRows, statementPeriodEnd: "2025-01-31"
+  rows: paddedRows, programFeeRows, nonProgramFeeRows, statementPeriodEnd: "2025-01-31"
 });
 const paddedRow = padded.rows.find(row => row.description === "MC-WORLD ELITE MERIT III");
 assert.equal(paddedRow.status, "published_rate_variance");
@@ -57,5 +66,9 @@ assert.equal(paddedRow.variance, 5);
 const incompleteGap = engine.auditCommerceControlProgramFeeGap(programFeeRows.slice(1));
 assert.equal(incompleteGap.verified, false);
 assert.match(incompleteGap.blockReason, /\$289\.70/);
+
+const incompleteNonProgramFees = engine.auditCommerceControlNonProgramFees(nonProgramFeeRows.slice(1));
+assert.equal(incompleteNonProgramFees.verified, false);
+assert.match(incompleteNonProgramFees.blockReason, /\$97\.66/);
 
 console.log("Commerce Control interchange detail regression tests passed.");
