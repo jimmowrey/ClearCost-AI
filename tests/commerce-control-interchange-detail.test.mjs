@@ -12,6 +12,7 @@ vm.runInContext(source, context);
 const engine = context.globalThis.ClearCostCommerceControlInterchange;
 const pages = fixture.pages.map(page => ({ page_number: page.page_number, full_text: page.full_text }));
 const rows = engine.parseCommerceControlInterchangePages(pages);
+const programFeeRows = engine.parseCommerceControlProgramFeeGap(pages);
 
 assert.equal(rows.length, 53, "all 53 non-total detail rows from pages 5–7 are extracted");
 assert.equal(rows.filter(row => row.brand === "Mastercard").length, 13);
@@ -21,8 +22,17 @@ assert.equal(rows.filter(row => row.brand === "American Express").length, 2);
 assert.equal(rows.filter(row => row.brand === "Debit network").length, 8);
 assert.equal(Math.round(rows.reduce((sum, row) => sum + row.amount, 0) * 100), 111421);
 
+assert.equal(programFeeRows.length, 16, "all additional program and debit-network rows are extracted");
+const programFeeGap = engine.auditCommerceControlProgramFeeGap(programFeeRows);
+assert.equal(programFeeGap.verified, true);
+assert.equal(programFeeGap.assessmentTotal, 95.57);
+assert.equal(programFeeGap.debitNetworkTotal, 194.13);
+assert.equal(programFeeGap.total, 289.70);
+assert.equal(Math.round((programFeeGap.detailInterchangeTotal + programFeeGap.total) * 100), 140391);
+
 const audit = engine.auditCommerceControlRows({
   rows,
+  programFeeRows,
   statementPeriodEnd: "2025-01-31"
 });
 assert.equal(audit.detailTotal, 1114.21);
@@ -37,9 +47,15 @@ assert.match(audit.blockReason, /6 charged interchange row/);
 
 const paddedRows = rows.map(row => row.description === "MC-WORLD ELITE MERIT III"
   ? { ...row, amount: row.amount + 5 } : row);
-const padded = engine.auditCommerceControlRows({ rows: paddedRows, statementPeriodEnd: "2025-01-31" });
+const padded = engine.auditCommerceControlRows({
+  rows: paddedRows, programFeeRows, statementPeriodEnd: "2025-01-31"
+});
 const paddedRow = padded.rows.find(row => row.description === "MC-WORLD ELITE MERIT III");
 assert.equal(paddedRow.status, "published_rate_variance");
 assert.equal(paddedRow.variance, 5);
+
+const incompleteGap = engine.auditCommerceControlProgramFeeGap(programFeeRows.slice(1));
+assert.equal(incompleteGap.verified, false);
+assert.match(incompleteGap.blockReason, /\$289\.70/);
 
 console.log("Commerce Control interchange detail regression tests passed.");
