@@ -24,7 +24,7 @@ const fees = [
   },
 ];
 
-const ownership = CO.analyzeCostOwnership(fees, 1000);
+const publishedVerification = Object.freeze({ verified: true, blockReason: null });\nconst ownership = CO.analyzeCostOwnership(fees, 1000, 0.01, publishedVerification);
 assert.equal(ownership.verified, true);
 assert.equal(ownership.eligibleTotal, 1000);
 assert.equal(ownership.incumbentProcessorMarkup, 150);
@@ -49,10 +49,10 @@ assert.equal(proposal.projectedMonthlyResidual, 180);
 const unknown = CO.analyzeCostOwnership([
   ...fees,
   { amount: 10, status: "needs_review", bucket: "unknown", originalDescription: "Mystery" },
-], 1010);
+], 1010, 0.01, publishedVerification);
 assert.equal(unknown.verified, false);
 assert.equal(unknown.incumbentProcessorMarkup, null);
-assert.equal(unknown.unexplained.length, 1);
+assert.equal(unknown.unexplained.length, 1);\n\nconst unverifiedInterchange = CO.analyzeCostOwnership(fees, 1000);\nassert.equal(unverifiedInterchange.verified, false);\nassert.equal(unverifiedInterchange.incumbentProcessorMarkup, null);\nassert.match(unverifiedInterchange.blockReason, /Published interchange rates/);
 assert.equal(
   CO.calculateTraditionalProposal({
     monthlyVolume: 1,
