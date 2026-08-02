@@ -2262,6 +2262,7 @@ function currentInterchangeVerification() {
   const statement = state.results[0];
   if (!engine || !statement) return null;
   const rows = engine.parseCommerceControlInterchangePages(statement.pages || []);
+  const programFeeRows = engine.parseCommerceControlProgramFeeGap(statement.pages || []);
   const dates = String(statement.period || '').match(/\\d{2}\\/\\d{2}\\/\\d{2,4}/g) || [];
   const rawEnd = dates.at(-1);
   const statementPeriodEnd = rawEnd
@@ -2271,7 +2272,7 @@ function currentInterchangeVerification() {
         return `${year}-${month}-${day}`;
       })()
     : null;
-  return engine.auditCommerceControlRows({ rows, statementPeriodEnd });
+  return engine.auditCommerceControlRows({ rows, programFeeRows, statementPeriodEnd });
 }
 
 function currentCostOwnership(d = currentDiagnostic(), interchangeVerification = currentInterchangeVerification()) {
@@ -2630,6 +2631,19 @@ function openProfitability() {
       $('profitPublishedMatches').textContent = interchangeAudit
         ? `${interchangeAudit.matchedRowCount} matched · ${interchangeAudit.unresolved.length} unresolved`
         : 'Not verified';
+    }
+    if ($('profitProgramFeeGap')) {
+      $('profitProgramFeeGap').textContent = moneyText(interchangeAudit?.programFeeGap?.total);
+    }
+    if ($('profitAssessmentProgramFees')) {
+      $('profitAssessmentProgramFees').textContent = moneyText(
+        interchangeAudit?.programFeeGap?.assessmentTotal
+      );
+    }
+    if ($('profitDebitNetworkInterchange')) {
+      $('profitDebitNetworkInterchange').textContent = moneyText(
+        interchangeAudit?.programFeeGap?.debitNetworkTotal
+      );
     }
     const setOwnershipValue = (id, value) => {
       if ($(id)) $(id).textContent = moneyText(value);
